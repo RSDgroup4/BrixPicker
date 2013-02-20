@@ -1,0 +1,5 @@
+<launch>
+  <include file="$(find bpLaunch)/launch/usb_cam.launch" />
+  <include file="$(find bpLaunch)/launch/plc_serial_communication.launch" />
+  <include file="$(find bpLaunch)/launch/image_view.launch" />
+</launch>

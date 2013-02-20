@@ -4,8 +4,8 @@
         	<param name="publisher_topic" value="/bpDrivers/plc_serial_rx" />	 
         	<param name="subscriber_topic" value="/bpDrivers/plc_serial_tx" />
 		<param name="device" value="/dev/ttyUSB0" />	
-		<param name="baudrate" value="19200" />		
-		<param name="termination_character" value="0" />
+		<param name="baudrate" value="115200" />		
+		<param name="termination_character" value="13" />
 	</node>
 	</group>
 </launch>

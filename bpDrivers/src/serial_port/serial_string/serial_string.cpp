@@ -69,10 +69,11 @@ int main(int argc, char **argv)
   n.param<int> ("termination_character", term,10);
   n.param<int> ("baudrate", baudrate, 115200);
 
+  s_publisher = nh.advertise<bpMsgs::serial> (publisher_topic.c_str(), 20,1);
+
   serialInterface serialInterface(s_publisher);
   serialInterface.term_char = (char)term;
 
-  s_publisher = nh.advertise<bpMsgs::serial> (publisher_topic.c_str(), 20,1);
   s_subscriber = nh.subscribe<bpMsgs::serial> (subscriber_topic.c_str(), 20, &serialInterface::writeHandler, &serialInterface);
 
   while (serialInterface.openDevice(device, baudrate) != 0 && ros::ok())
