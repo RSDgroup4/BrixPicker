@@ -1,0 +1,20 @@
+<package>
+  <description brief="bpPLCController">
+
+     bpPLCController
+
+  </description>
+  <author>Jeppe Pedersen</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/</url>
+
+  <depend package="roscpp"/>
+  <depend package="std_msgs"/>
+  <depend package="geometry_msgs"/>
+  <depend package="sensor_msgs"/>
+  <depend package="bpMsgs"/>
+
+</package>
+
+

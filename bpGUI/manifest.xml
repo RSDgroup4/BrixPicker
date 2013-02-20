@@ -1,0 +1,20 @@
+<package>
+  <description brief="bpGUI">
+
+     bpGUI
+
+  </description>
+  <author>Jeppe Pedersen</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/bpGUI</url>
+
+  <rosdep name="libqt4-dev"/>
+  <depend package="qt_build"/>
+  <depend package="roscpp"/>
+
+  <depend package="std_msgs"/>
+  <depend package="geometry_msgs"/>
+  <depend package="sensor_msgs"/>
+  <depend package="bpMsgs"/>
+</package>

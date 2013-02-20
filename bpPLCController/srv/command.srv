@@ -1,0 +1,11 @@
+uint8 START_BELT = 1
+uint8 STOP_BELT = 2
+uint8 SET_BELT_SPEED = 3
+uint8 GET_BELT_SPEED = 4
+uint8 TOGGLE_EMERGENCY_STOP = 5
+uint8 GET_EMERGENCY_STOP_STATUS = 6
+uint8 command_number
+float32 value
+---
+bool result
+float32 value
