@@ -18,6 +18,7 @@ PLCController::PLCController()
 bool PLCController::commandServiceHandler(	bpPLCController::command::Request  &req,
          	 	 	 	 	 	 	 	 	bpPLCController::command::Response &res)
 {
+	bpMsgs::serial msg;
 	switch (req.command_number) {
 			case bpPLCController::command::Request::SET_BELT_SPEED:
 				ROS_INFO("PLC service: Setting beltspeed to: %f", req.value);
@@ -27,12 +28,26 @@ bool PLCController::commandServiceHandler(	bpPLCController::command::Request  &r
 				break;
 			case bpPLCController::command::Request::START_BELT:
 				ROS_INFO("PLC service: Start belt");
+				msg.data = "BELT_START";
+				plc_serial_publisher.publish(msg);
 				break;
 			case bpPLCController::command::Request::STOP_BELT:
 				ROS_INFO("PLC service: Stop belt");
+				msg.data = "BELT_STOP";
+				plc_serial_publisher.publish(msg);
 				break;
 			case bpPLCController::command::Request::TOGGLE_EMERGENCY_STOP:
 				ROS_INFO("PLC service: Toggle emergency stop");
+				break;
+			case bpPLCController::command::Request::SET_BELT_DIRECTION:
+				ROS_INFO("PLC service: Set belt direction");
+				if (req.value == 1)
+					msg.data = "BELT_FORWARD";
+				else if (req.value == -1)
+					msg.data = "BELT_REVERSE";
+				else
+					break;
+				plc_serial_publisher.publish(msg);
 				break;
 			case bpPLCController::command::Request::GET_EMERGENCY_STOP_STATUS:
 				ROS_INFO("PLC service: Get emergency stop status");

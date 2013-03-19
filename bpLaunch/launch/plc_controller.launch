@@ -1,4 +1,5 @@
 <launch>
+  <include file="$(find bpLaunch)/launch/plc_serial_communication.launch" />
   <node name="plc_controller" pkg="bpPLCController" type="plc_controller" output="screen">
     <param name="plc_serial_tx_publisher_topic" value="/bpDrivers/plc_serial_tx" />
     <param name="plc_serial_rx_subscriber_topic" value="/bpDrivers/plc_serial_rx" />

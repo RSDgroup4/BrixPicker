@@ -19,14 +19,44 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #uncomment if you have defined messages
 #rosbuild_genmsg()
 #uncomment if you have defined services
-#rosbuild_gensrv()
+rosbuild_gensrv()
 
 rosbuild_add_boost_directories()
 
-# Serial driver
+### Serial driver ###
 rosbuild_add_executable(serial_string src/serial_port/serial_string/serial_string.cpp)
 rosbuild_add_executable(serial_string src/serial_port/serial_string/serialInterface.cpp)
 rosbuild_link_boost(serial_string system thread)
+### end of Serial driver ###
+
+#### rx60 driver ###
+set(SrcFiles
+  src/rx60_controller/RX60Driver.cpp
+  src/rx60_controller/RX60TCPSocket.cpp)
+
+#link_directories( )
+
+set(LibraryList
+  pthread
+  curses)
+
+# The shared library to build:
+rosbuild_add_library(RX60 SHARED ${SrcFiles})
+
+# Link the standard static libraries with with the shared library:
+target_link_libraries(RX60 ${LibraryList})
+
+add_executable(test-RX60 src/rx60_controller/test.cpp)
+target_link_libraries(test-RX60 RX60)
+rosbuild_link_boost(test-RX60 system thread)
+
+add_executable(rx60_controller src/rx60_controller/rx60_controller_node.cpp
+							   src/rx60_controller/RX60Driver.cpp)
+target_link_libraries(rx60_controller RX60)
+rosbuild_link_boost(rx60_controller system thread)
+
+### end of rx60 driver ###
+
 
 #common commands for building c++ executables and libraries
 #rosbuild_add_library(${PROJECT_NAME} src/example.cpp)
