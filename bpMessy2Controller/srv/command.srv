@@ -1,0 +1,13 @@
+uint8 GET_ORDERS = 1
+uint8 TAKE_ORDER = 2
+uint8 FINISH_ORDER = 3
+
+uint8 command_number
+int32 max_orders
+int32 order_id
+int32 order_ticket
+---
+bpMsgs/order[] orders
+bool succes
+string order_ticket
+
