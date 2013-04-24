@@ -1,0 +1,15 @@
+<CollisionSetup>
+    <Exclude>
+	<FramePair first="StaubliRX60.Base" second="WorkCellFrame" />	
+	<FramePair first="CameraBoxFrame" second="WorkCellFrame" />	
+	<FramePair first="CameraBoxFrame" second="Belt" />
+	<FramePair first="Belt" second="WorkCellFrame" />
+	<FramePair first="StaubliRX60.Joint5" second="TEST.Base" />	
+	<FramePair first="StaubliRX60.Joint6" second="TEST.Base" /> 
+	<FramePair first="StaubliRX60.Base" second="WorkCellFrame" /> 
+	<FramePair first="Box1Frame" second="WorkCellFrame" />
+	<FramePair first="Box2Frame" second="WorkCellFrame" />
+	<FramePair first="Box3Frame" second="WorkCellFrame" />
+
+   </Exclude>
+</CollisionSetup>

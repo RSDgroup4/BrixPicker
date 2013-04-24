@@ -1,0 +1,66 @@
+<WorkCell name="BrixPicker">
+
+<Frame name="Robot" refframe="WORLD">
+   <RPY> 0 0 0 </RPY> <Pos> 0 0 0 </Pos>
+</Frame>
+
+<Include file="StaubliRX60/StaubliRX60.wc.xml" />
+
+<Frame name="ToolMount" refframe="StaubliRX60.Joint6">
+    <RPY>0 0 0</RPY> <Pos> 0 0 0.001 </Pos>
+</Frame>
+
+<Include file="Gripper/Gripper.wc.xml" />
+
+<Frame name="Belt" refframe="WORLD">
+     <RPY> 0 0 90 </RPY> <Pos> 0.35 -0.515 0.07 </Pos>
+     <Drawable name="Belt" refframe="Belt">
+         <Polytope file="Geometry/belt" />
+     </Drawable>
+</Frame>
+
+<Frame name="WorkCellFrame" refframe="WORLD">
+     <RPY> 90 0 90 </RPY> <Pos> 0 -0.515 -0.045 </Pos>
+     <Drawable name="WorkCellFrame" refframe="WorkCellFrame">
+         <Polytope file="Geometry/workcell" />
+     </Drawable>
+</Frame>
+
+<Frame name="CameraBoxFrame" refframe="WORLD">
+     <RPY> 0 0 90 </RPY> <Pos> 0.35 -1.0 0 </Pos>
+     <Drawable name="CameraBoxFrame" refframe="CameraBoxFrame">
+         <Polytope file="Geometry/camerabox" />
+     </Drawable>
+</Frame>
+
+<Frame name="TubesFrame" refframe="WORLD">
+     <RPY> -90 0 90 </RPY> <Pos> 0.57 0 0.12 </Pos>
+     <Drawable name="TubesFrame" refframe="TubesFrame">
+         <Polytope file="Geometry/tubes" />
+     </Drawable>
+</Frame>
+
+<Frame name="Box1Frame" refframe="WORLD">
+     <RPY> 90 0 90 </RPY> <Pos> 0.70 0 0 </Pos>
+     <Drawable name="Box1Frame" refframe="Box1Frame">
+         <Polytope file="Geometry/box" />
+     </Drawable>
+</Frame>
+
+<Frame name="Box2Frame" refframe="Box1Frame">
+     <RPY> 0 0 0 </RPY> <Pos> 0.09 0 0 </Pos>
+     <Drawable name="Box2Frame" refframe="Box2Frame">
+         <Polytope file="Geometry/box" />
+     </Drawable>
+</Frame>
+
+<Frame name="Box3Frame" refframe="Box1Frame">
+     <RPY> 0 0 0 </RPY> <Pos> -0.09 0 0 </Pos>
+     <Drawable name="Box3Frame" refframe="Box3Frame">
+         <Polytope file="Geometry/box" />
+     </Drawable>
+</Frame>
+
+<CollisionSetup file="SceneCollisionSetup.prox.xml" /> 
+
+</WorkCell>

@@ -1,0 +1,21 @@
+<package>
+  <description brief="bpRobotMotionPlanner">
+
+     bpRobotMotionPlanner
+
+  </description>
+  <author>RSD group4</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/bpRobotMotionPlanner</url>
+
+  <depend package="roscpp"/>
+  <depend package="std_msgs"/>
+  <depend package="geometry_msgs"/>
+  <depend package="sensor_msgs"/>
+  <depend package="bpMsgs"/>
+  <depend package="bpDrivers"/>
+
+</package>
+
+
