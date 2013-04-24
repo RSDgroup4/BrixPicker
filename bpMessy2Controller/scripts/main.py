@@ -25,22 +25,18 @@ def getOrderList(max_orders):
         r = requests.get(requestString,  stream = True)
         orderXml = parseString(r.text)
         orderData = order()
-        xmlRed = orderXml.getElementsByTagName('red')[0].toxml()
-        xmlBlue = orderXml.getElementsByTagName('blue')[0].toxml()
-        xmlYellow = orderXml.getElementsByTagName('yellow')[0].toxml()
-        xmlTime = orderXml.getElementsByTagName('time')[0].toxml()
-        xmlStatus = orderXml.getElementsByTagName('status')[0].toxml()
         orderData.order_id = int(requestString.replace('http://192.168.10.100/orders/ord_',''))
+        orderData.red_bricks = int(orderXml.getElementsByTagName('red')[0].toxml().replace('<red>','').replace('</red>',''))
+        orderData.blue_bricks = int(orderXml.getElementsByTagName('blue')[0].toxml().replace('<blue>','').replace('</blue>',''))
+        orderData.yellow_bricks = int(orderXml.getElementsByTagName('yellow')[0].toxml().replace('<yellow>','').replace('</yellow>',''))
+        orderData.time  = orderXml.getElementsByTagName('time')[0].toxml().replace('<time>','').replace('</time>','')
+        xmlStatus = orderXml.getElementsByTagName('status')[0].toxml()
         if xmlStatus.replace('<status>','').replace('</status>','') == "ready":
             orderData.status = orderData.STATUS_READY
         elif xmlStatus.replace('<status>','').replace('</status>','') == "taken":
             orderData.status = orderData.STATUS_TAKEN
         else:
             orderData.status = orderData.STATUS_UNKNOWN
-        orderData.time = xmlTime.replace('<time>','').replace('</time>','')
-        orderData.red_bricks = int(xmlRed.replace('<red>','').replace('</red>',''))
-        orderData.blue_bricks = int(xmlBlue.replace('<blue>','').replace('</blue>',''))
-        orderData.yellow_bricks = int(xmlYellow.replace('<yellow>','').replace('</yellow>',''))
         ret.append(orderData)
         
     return ret
