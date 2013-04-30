@@ -1,10 +1,11 @@
 <!--xml-->
 <launch>
-  <node ns="camera" pkg="usb_cam" type="camera_node" name="usb_cam" output="screen">
-    <param name="width" type="int" value="640" />
-    <param name="height" type="int" value="480" />
-    <param name="fps" type="int" value="30" />
-    <param name="frame" type="string" value="webcam" />
-    <param name="device" type="string" value="/dev/video0" />
-  </node>
+  <node ns="camera" pkg="usb_cam" type="usb_cam_node" name="usb_cam" output="screen">
+    <param name="image_width" type="int" value="640" />
+    <param name="image_height" type="int" value="480" />'
+    <param name="autofocus" type="bool" value="true"/>
+    <param name="video_device" type="string" value="/dev/video0" />    
+    <!--<param name="fps" type="int" value="30" />
+    <param name="frame" type="string" value="webcam" />-->
+    </node>
 </launch>

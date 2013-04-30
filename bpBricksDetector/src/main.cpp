@@ -224,11 +224,32 @@ void callback( int, void* )
 }
 
 void filter(Mat img){
-	for(int i = 0 ; i < img.rows ; i++ )
+	vector<int> rect;
+	int vardi = 0;
+	for(int i = 3 ; i < img.rows -3 ; i++ )
 	 {
-				// Iterate over the elements in the current line
-			    for(int j = 0 ; j < img.cols ; j++ ) {
 
+			    for(int j = 3 ; j < img.cols-3 ; j++ ) {
+
+			    		rect[0] = img.data[(i-1)*img.cols+(j-1)];
+			    		rect[1] = img.data[i*img.cols+(j-1)];
+			    		rect[2] = img.data[(i+1)*img.cols+(j-1)];
+			    		rect[3] = img.data[(i-1)*img.cols+j];
+			    		rect[4] = img.data[i*img.cols+j];
+			    		rect[5] = img.data[(i+1)*img.cols+j];
+			    		rect[6] = img.data[(i-1)*img.cols+(j+1)];
+			    		rect[7] = img.data[i*img.cols+(j+1)];
+			    		rect[8] = img.data[(i+1)*img.cols+(j+1)];
+			    	for (int k = 0; k<9;k++){
+			    		vardi =+ rect[k];
+			    	}
+			    	vardi = vardi/255;
+			    	if (vardi > 6) {
+			    		img.data[i*img.cols+j] = 255;
+			    	}
+			    	else {
+			    		img.data[i*img.cols+j] = 0;
+			    	}
 			    }
 }
 }
