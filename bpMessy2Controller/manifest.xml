@@ -4,13 +4,10 @@
      bpMessy2Controller
 
   </description>
-  <author>RSD group4</author>
+  <author>viki</author>
   <license>BSD</license>
   <review status="unreviewed" notes=""/>
   <url>http://ros.org/wiki/bpMessy2Controller</url>
-  <depend package="std_msgs"/>
-  <depend package="rospy"/>
-  <depend package="roscpp"/>
   <depend package="bpMsgs"/>
 
 </package>
