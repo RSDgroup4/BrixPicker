@@ -3,9 +3,9 @@
  *  Created on: Feb 17, 2012
  *      Author: klaus
  */
-#include <ros/ros.h>
+/*#include <ros/ros.h>
 #include <image_transport/image_transport.h>
-#include <cv_bridge/CvBridge.h>
+//#include <cv_bridge/CvBridge.h>
 #include <sensor_msgs/image_encodings.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -41,3 +41,4 @@ int main(int argc, char** argv)
     loop_rate.sleep();
   }
 }
+*/
