@@ -16,7 +16,7 @@ import datetime
 
 def putRequest(url):
     try:
-        ret = requests.put(url,  stream = True, timeout=0.5)
+        ret = requests.put(url,  stream = True, timeout=2)
     except requests.exceptions.RequestException:
         print "PutRequest failed: failed to connect to server"
         return -10, ""
@@ -25,7 +25,7 @@ def putRequest(url):
 
 def deleteRequest(url):
     try:
-        ret = requests.delete(url,  stream = True, timeout=0.5)
+        ret = requests.delete(url,  stream = True, timeout=2)
     except requests.exceptions.RequestException:
         print "DeleteRequest failed: failed to connect to server"
         return -10
@@ -34,7 +34,7 @@ def deleteRequest(url):
 
 def getRequest(url):
     try:
-        ret = requests.get(url,  stream = True, timeout=0.5)
+        ret = requests.get(url,  stream = True, timeout=2)
     except requests.exceptions.RequestException:
         print "GetRequest failed: failed to connect to server"
         return -10, ""
@@ -43,7 +43,7 @@ def getRequest(url):
 
 def postRequest(url, Data):
     try:
-        ret = requests.post(url, data=Data, stream = True, timeout=0.5)
+        ret = requests.post(url, data=Data, stream = True, timeout=2)
     except requests.exceptions.RequestException:
         print "Postfailed: failed to connect to server"
         return -10
@@ -158,7 +158,6 @@ def placeLog(log_event, log_comment):
     return ret
 
 def order_service_handler(req):
-    print "Order number: %d"%(req.command_number)
     ret = commandResponse()
     if req.command_number == req.GET_ORDERS:
         print "Get Orders"
@@ -261,23 +260,23 @@ class CommunicationThread (threading.Thread):
                 [status_code, response] = getRequest(self.__OrderUrls[i])
                 if status_code != 200:
                     print "Error getting order, error_code: %d" % status_code
-                    return
-                r = requests.get(self.__OrderUrls[i],  stream = True)
-                orderXml = parseString(response)
-                orderData = order()
-                orderData.order_id = int(self.__OrderUrls[i].replace(serverAddress + '/orders/ord_',''))
-                orderData.red_bricks = int(orderXml.getElementsByTagName('red')[0].toxml().replace('<red>','').replace('</red>',''))
-                orderData.blue_bricks = int(orderXml.getElementsByTagName('blue')[0].toxml().replace('<blue>','').replace('</blue>',''))
-                orderData.yellow_bricks = int(orderXml.getElementsByTagName('yellow')[0].toxml().replace('<yellow>','').replace('</yellow>',''))
-                orderData.time  = orderXml.getElementsByTagName('time')[0].toxml().replace('<time>','').replace('</time>','')
-                xmlStatus = orderXml.getElementsByTagName('status')[0].toxml()
-                if xmlStatus.replace('<status>','').replace('</status>','') == "ready":
-                    orderData.status = orderData.STATUS_READY
-                elif xmlStatus.replace('<status>','').replace('</status>','') == "taken":
-                    orderData.status = orderData.STATUS_TAKEN
                 else:
-                    orderData.status = orderData.STATUS_UNKNOWN
-                self.__OrderList.append(orderData)
+                    r = requests.get(self.__OrderUrls[i],  stream = True)
+                    orderXml = parseString(response)
+                    orderData = order()
+                    orderData.order_id = int(self.__OrderUrls[i].replace(serverAddress + '/orders/ord_',''))
+                    orderData.red_bricks = int(orderXml.getElementsByTagName('red')[0].toxml().replace('<red>','').replace('</red>',''))
+                    orderData.blue_bricks = int(orderXml.getElementsByTagName('blue')[0].toxml().replace('<blue>','').replace('</blue>',''))
+                    orderData.yellow_bricks = int(orderXml.getElementsByTagName('yellow')[0].toxml().replace('<yellow>','').replace('</yellow>',''))
+                    orderData.time  = orderXml.getElementsByTagName('time')[0].toxml().replace('<time>','').replace('</time>','')
+                    xmlStatus = orderXml.getElementsByTagName('status')[0].toxml()
+                    if xmlStatus.replace('<status>','').replace('</status>','') == "ready":
+                        orderData.status = orderData.STATUS_READY
+                    elif xmlStatus.replace('<status>','').replace('</status>','') == "taken":
+                        orderData.status = orderData.STATUS_TAKEN
+                    else:
+                        orderData.status = orderData.STATUS_UNKNOWN
+                    self.__OrderList.append(orderData)
         
         # Copy order list to public orderlist
         dataLock.acquire()
@@ -289,7 +288,7 @@ def order_service():
     rospy.init_node('Messy2Controller')
     global serverAddress
     serverAddress = "http://192.168.10.100"
-    s = rospy.Service('order_service', command, order_service_handler)
+    s = rospy.Service('/Messy2Controller/order_service', command, order_service_handler)
     print "Messy2Controller started and order_service started"
     
     global ComThread

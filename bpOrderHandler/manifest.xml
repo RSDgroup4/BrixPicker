@@ -1,0 +1,19 @@
+<package>
+  <description brief="bpOrderHandler">
+
+     bpOrderHandler
+
+  </description>
+  <author>RSD group4</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/bpOrderHandler</url>
+  <depend package="roscpp"/>
+  <depend package="rospy"/>
+  <depend package="bpMsgs"/>
+  <depend package="bpMessy2Controller"/>
+  <depend package="bpPLCController"/>
+
+</package>
+
+
