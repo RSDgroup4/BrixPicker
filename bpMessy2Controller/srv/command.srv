@@ -1,11 +1,29 @@
 uint8 GET_ORDERS = 1
 uint8 TAKE_ORDER = 2
 uint8 FINISH_ORDER = 3
+uint8 FIND_ORDERS = 4
+uint8 LOG = 5
+
+uint8 PML_IDLE = 10
+uint8 PML_EXECUTE = 11
+uint8 PML_COMPLETE = 12
+uint8 PML_HELD = 13
+uint8 PML_SUSPENDED = 14
+uint8 PML_ABORTED = 15
+uint8 PML_STOPPED = 16
+uint8 ORDER_START = 17
+uint8 ORDER_DONE = 18
 
 uint8 command_number
 int32 max_orders
 int32 order_id
-int32 order_ticket
+string order_ticket
+int32 red_bricks
+int32 blue_bricks
+int32 yellow_bricks
+uint8 log_event
+string log_comment
+
 ---
 bpMsgs/order[] orders
 bool succes
