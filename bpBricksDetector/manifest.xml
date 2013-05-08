@@ -14,6 +14,7 @@
   <depend package="opencv2"/>
   <depend package="cv_bridge"/>
   <depend package="uvc_camera"/>
+  <depend package="bpMsgs"/>
 
 </package>
 

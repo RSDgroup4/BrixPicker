@@ -2,6 +2,7 @@
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
+#include <bpMsgs/brick.h>
 //#include <opencv2/imgproc/imgproc.hpp>
 //#include <opencv2/highgui/highgui.hpp>
 #include <opencv2/opencv.hpp>
@@ -34,6 +35,7 @@ int randomst = 255;
 
 //Use method of ImageTransport to create image publisher
 image_transport::Publisher pub;
+ros::Publisher brick_pub;
 
 void HSVToBW(const Mat &imgSrc, Mat &imgDst, int a)
 {
@@ -256,6 +258,10 @@ void filter(Mat img){
 //This function is called everytime a new image is published
 void imageCallback(const sensor_msgs::ImageConstPtr& original_image)
 {
+
+	bpMsgs::brick brick;
+	brick.header.stamp.sec = original_image->header.stamp.sec;
+	brick.header.stamp.nsec = original_image->header.stamp.nsec;
 ROS_INFO("stamp sec: %ld nano: %ld", (long int)original_image->header.stamp.sec, (long int)original_image->header.stamp.nsec);
 	cv::namedWindow("trackBar", CV_WINDOW_NORMAL);
 	cv::resizeWindow("trackBar", 400, 300);
@@ -300,7 +306,7 @@ ROS_INFO("stamp sec: %ld nano: %ld", (long int)original_image->header.stamp.sec,
 
 	HSVToBW(cv_ptr->image,imgdest,2);
 
-	filter(imgdest);
+	//filter(imgdest);
 
 	//erode(imgdest,imgdest,Size(3,3),Point(0,0),3);
 	//erode(imgdest,imgdest,Mat(),Point(-1,-1),3);
@@ -347,6 +353,22 @@ ROS_INFO("stamp sec: %ld nano: %ld", (long int)original_image->header.stamp.sec,
 		   _ma[i] = (0.5*atan2(2*_mu[i].mu11,_mu[i].mu20-_mu[i].mu02))*180/M_PI;
 		   ROS_INFO("Contour no: %ld Area: %ld Center x: %ld  y: %ld  Orientation: %ld ", (long int)i,(long int)area,(long int)_mc[i].x, (long int)_mc[i].y, (long int)_ma[i]);
 		   ROS_INFO("Contour no: %ld Area: %ld Center x: %ld  y: %ld  Orientation: %ld ", (long int)i,(long int)area,(long int)minRect[i].center.x, (long int)minRect[i].center.y, (long int)minRect[i].angle);
+		   brick.angle = _ma[i];
+		   brick.x = minRect[i].center.x;
+		   brick.y = minRect[i].center.y;
+		   if (area > 3000 && area < 5000) {
+			   brick.type = 2;
+		   }
+		   else if (area > 7000 && area < 9000){
+			   brick.type = 1;
+		   }
+		   else if(area > 11000 && area < 13000){
+			   brick.type = 3;
+		   }
+		   else{
+			   brick.type = 0;
+		   }
+		   brick_pub.publish(brick);
 		   }
 		  // cout << "Contour no: " << i << " Area: " << area << " Center x: " << _mc[i].x << " y: " << _mc[i].y << " Orientation: " << _ma[i] << endl;
 		 //  cout << "Ellipse Orientation: " << minEllipse[i].angle << endl;
@@ -398,14 +420,15 @@ int main(int argc, char **argv)
         ros::NodeHandle nh;
 	//Create an ImageTransport instance, initializing it with our NodeHandle.
         image_transport::ImageTransport it(nh);
-	
+        brick_pub = nh.advertise<bpMsgs::brick>("brick_pub", 10);
+
 	cv::namedWindow("image processed", CV_WINDOW_NORMAL);
 	cv::namedWindow("contours", CV_WINDOW_NORMAL);
 	cv::namedWindow("trackBar", CV_WINDOW_NORMAL);
 	cv::resizeWindow("trackBar", 400, 400);
 	cv::namedWindow("grey", CV_WINDOW_NORMAL);
 
-	
+
 
 
      //   image_transport::Subscriber sub = it.subscribe("/usb_cam/image_raw", 1, imageCallback);
