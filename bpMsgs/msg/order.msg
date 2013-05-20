@@ -5,6 +5,7 @@ int32 STATUS_TAKEN = 2
 Header header
 int32 status
 string time
+int32 order_tray
 int32 order_id
 int32 order_ticket
 int32 red_bricks
