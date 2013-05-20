@@ -6,16 +6,224 @@ from bzrlib.switch import switch
 from rospy.timer import sleep
 from rospy.timer import Timer
 from std_msgs.msg import String
+from bpMsgs.msg import brick
+from bpMsgs.msg import system_state
+from bpMsgs.msg import robot_pick
+from bpMessy2Controller.srv import *
+from dynamic_reconfigure.server import Server
+from bpOrderHandler.cfg import offset_paramsConfig
 import rospy
 import threading
 import time
 import datetime
+import genpy
+
+#Global variables
+state = system_state()
+next_state = system_state()
+loop_rate = 10
+bricks = []
+myOrder = 0
+originalOrder = 0
+offset_x = 0
+offset_y = 0
+belt_speed = 0
+take_order = False
+robot_publisher = 0
+
+def dynamic_reconfiguration_callback(config, level):
+    global offset_x
+    global offset_y
+    global belt_speed
+    global take_order
+    offset_x = config.offset_x
+    offset_y = config.offset_y
+    belt_speed = config.belt_speed
+    take_order = config.take_order
+    return config
+
+def hasStateChanged():
+    if next_state.state != state.state:
+        return True
+    return False
+
+def findOrder(blue, red, yellow):
+    rospy.wait_for_service('/Messy2Controller/order_service')
+    try:
+        getOrders = rospy.ServiceProxy('/Messy2Controller/order_service', command)
+        request = commandRequest()
+        request.command_number = request.FIND_ORDERS
+        request.blue_bricks = blue
+        request.red_bricks = red
+        request.yellow_bricks = yellow
+        response = getOrders(request)
+        return response.orders
+    except rospy.ServiceException, e:
+        print "Service call failed: %s"%e
+        
+def takeOrder(order):
+    rospy.wait_for_service('/Messy2Controller/order_service')
+    try:
+        takeOrder = rospy.ServiceProxy('/Messy2Controller/order_service', command)
+        request = commandRequest()
+        request.command_number = request.TAKE_ORDER
+        request.order_id = order.order_id
+        response = takeOrder(request)
+        if response.succes:
+            return response.order_ticket
+        else:
+            rospy.loginfo("Taking order failed, order_id: %d" % order.order_id)
+            return 0
+    except rospy.ServiceException, e:
+        print "Service call failed: %s"%e
+        return 0
+    
+    
+def finishOrder(order):
+    rospy.wait_for_service('/Messy2Controller/order_service')
+    try:
+        finishOrder = rospy.ServiceProxy('/Messy2Controller/order_service', command)
+        request = commandRequest()
+        request.command_number = request.FINISH_ORDER
+        request.order_id = order.order_id
+        request.order_ticket = order.order_ticket
+        response = finishOrder(request)
+        if response.succes:
+            return True
+        else:
+            rospy.loginfo("Sending Finishing order message failed, order_id: %d" % order.order_id)
+            return False
+    except rospy.ServiceException, e:
+        print "Service call failed: %s"%e
+        return False
+
+def execute():
+    global myOrder
+    global bricks
+    global originalOrder
+    rospy.loginfo("PML_EXECUTE")
+    # If no order set, take order
+    if myOrder == 0:
+        # todo: add smarter selection
+        tempOrders = findOrder(0,0,0)
+        if len(tempOrders) > 0:
+            for i in range(len(tempOrders)):
+                myOrder = tempOrders[i]
+                if take_order:
+                    order_ticket = takeOrder(myOrder)
+                else:
+                    order_ticket = "null"
+                if order_ticket != 0:
+                    myOrder.order_ticket = order_ticket
+                    myOrder.header.stamp = rospy.Time.now()
+                    originalOrder = myOrder
+                    rospy.loginfo("ID: %d, ticket: %s, time: %s" % (myOrder.order_id, myOrder.order_ticket, myOrder.header.stamp))
+                    rospy.loginfo("New order chosen with id: %d - blue: %d, red %d, yellow %d" % (myOrder.order_id, myOrder.blue_bricks, myOrder.red_bricks, myOrder.yellow_bricks))
+                    break
+    
+
+    
+    # Check if order is done
+    if myOrder.blue_bricks == 0 and myOrder.red_bricks == 0 and myOrder.yellow_bricks == 0:
+        rospy.loginfo("Order #%d done" % myOrder.order_id)
+        if finishOrder(originalOrder):
+            rospy.loginfo("Order finished succesfully")
+        else:
+            rospy.loginfo("Sending finish request failed")
+    # Find brick to pick
+    else:
+        if len(bricks) == 0:
+            rospy.loginfo("No bricks at the belt")
+        else:
+            rospy.loginfo("Bricks in system: %d" % len(bricks))
+            
+                
+                
+            
+    # Check if order is to old (Over 3 minuts)
+    if rospy.Time.now().secs - myOrder.header.stamp.secs > 180:
+        rospy.loginfo("Order #%d now done in time..! Order is being discarded" % myOrder.order_id)
+        myOrder = 0
+        originalOrder = 0
+            
+            
+def robotCallback(msg):
+    rospy.loginfo("TESTING")
+            
+
+def changeStateCallback(msg):
+    global next_state 
+    rospy.loginfo("state changed!")
+    next_state.state = msg.state
+    
+def brickCallback(msg):
+    rospy.loginfo("Brick recieved")
+    global bricks
+    brickAlreadyExists = False
+    for i in range(len(bricks)):
+        if msg.id == bricks[i].id:
+            brickAlreadyExists = True
+    if not brickAlreadyExists:
+        bricks.append(msg)
 
 def orderHandler():
     rospy.init_node('OrderHandler')
-
+    
     print "OrderHandler started"
-
+    # Init
+    global loop_rate
+    loop_rate = rospy.get_param("~loop_rate", 10)
+    global state
+    state.state = state.PML_IDLE
+    global next_state
+    next_state.state = state.PML_IDLE
+    
+    # Subscriber for external state change
+    changeStateTopic = rospy.get_param("~change_state_sub_topic", "/bpOrderHandler/change_state")
+    rospy.Subscriber(changeStateTopic, system_state, changeStateCallback)
+    
+    # Subscriber for detected legobricks
+    brickTopic = rospy.get_param("~brick_sub_topic", "/bpBrickDetector/bricks")
+    rospy.Subscriber(brickTopic, brick, brickCallback)
+    
+    # Publisher for the robot motion planner
+    robotplannerPubTopic = rospy.get_param("~robot_planner_pub_topic", "/bpRobotMotionControler/brick_command_topic")
+    robot_publisher = rospy.Publisher(robotplannerPubTopic, robot_pick)
+    
+    # Subscriber for the robot planner messages
+    robotplannerSubTopic = rospy.get_param("~robot_planner_sub_topic", "/bpRobotMotionControler/brick_response_topic")
+    rospy.Subscriber(robotplannerSubTopic, robot_pick, robotCallback)
+    
+    # Add dynamic reconfiguration server
+    dyn_srv = Server(offset_paramsConfig, dynamic_reconfiguration_callback)
+    
+    
+    # End of Init
+    
+    
+    # PML statemachine loop
+    while not rospy.is_shutdown():
+        if hasStateChanged():
+            rospy.loginfo("System state changed from %d to %d" % (state.state, next_state.state))
+            state.state = next_state.state       
+                 
+        if state.state == state.PML_IDLE:
+            rospy.loginfo("PML_IDLE")
+        elif state.state == state.PML_EXECUTE:
+            execute()
+        elif state.state == state.PML_COMPLETE:
+            rospy.loginfo("PML_COMPLETE")
+        elif state.state == state.PML_HELD:
+            rospy.loginfo("PML_HELD")
+        elif state.state == state.PML_SUSPENDED:
+            rospy.loginfo("PML_SUSPENDED")
+        elif state.state == state.PML_ABORTED:
+            rospy.loginfo("PML_ABORTED")
+        elif state.state == state.PML_STOPPED:
+            rospy.loginfo("PML_STOPPED")
+        
+        rospy.sleep(1.0/loop_rate)
+        
     rospy.spin()
     
     print "OrderHandler shutting down..."

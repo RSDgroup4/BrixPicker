@@ -13,6 +13,7 @@
   <depend package="bpMsgs"/>
   <depend package="bpMessy2Controller"/>
   <depend package="bpPLCController"/>
+  <depend package="dynamic_reconfigure"/>
 
 </package>
 

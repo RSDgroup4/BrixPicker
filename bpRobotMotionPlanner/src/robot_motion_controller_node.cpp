@@ -11,128 +11,398 @@
 #include "ros/ros.h"
 #include "bpDrivers/command.h"
 #include <math.h>
+#include "bpMsgs/robot_pick.h"
+
+#define M2MM 1000.0
+
+enum state {
+	idle,
+	wait_for_wait_position,
+	go_down_to_pick_brick,
+	wait_for_grip_position,
+	wait_for_brick,
+	go_to_delivery_position,
+	wait_for_delivery_position,
+	go_to_safe_position,
+	wait_for_safe_position,
+	failed,
+	succeded
+};
+
+double robot_min_x = 0.260;
+double robot_max_x = 0.440;
+double robot_center_x = 0.350;
+double robot_min_y = -0.400;
+double robot_max_y = 0.400;
+double robot_z_center_pickup = -0.219;//-0.218;
+double robot_z_center_hover = -0.160;//-0.16;
+double belt_speed = 0;
+double time_to_pick = 3;
+
+std::vector<bpMsgs::robot_pick> pending_bricks;
+
+std::vector<bpDrivers::commandRequest> cmdOrder;
+std::vector<bpDrivers::commandRequest> cmdOrderDropoff;
+bpDrivers::commandRequest cmdOrder1;
+bpDrivers::commandRequest cmdOrder2;
+bpDrivers::commandRequest cmdOrder3;
+bpDrivers::commandRequest cmdOrder1dropoff;
+bpDrivers::commandRequest cmdOrder2dropoff;
+bpDrivers::commandRequest cmdOrder3dropoff;
+bpDrivers::commandRequest cmdIdle;
+bpDrivers::commandRequest cmdShutdown;
+bpDrivers::commandRequest cmdWaitPosition;
+bpDrivers::commandRequest cmdGripPosition;
+bpDrivers::commandRequest cmdCloseGripper;
+bpDrivers::commandRequest cmdOpenGripper;
+
+
+
+void setKnownConfs(void)
+{
+	cmdIdle.command_number = bpDrivers::commandRequest::SET_JOINT_CONFIGURATION;
+	cmdIdle.joint1 = -1.53;
+	cmdIdle.joint2 = 27.62;
+	cmdIdle.joint3 = 116.53;
+	cmdIdle.joint4 = 0;
+	cmdIdle.joint5 = 35.93;
+	cmdIdle.joint6 = -1.6;
+//	cmdIdle.joint1 = -7.67;
+//	cmdIdle.joint2 = 19.28;
+//	cmdIdle.joint3 = 100.87;
+//	cmdIdle.joint4 = 0;
+//	cmdIdle.joint5 = 59.84;
+//	cmdIdle.joint6 = -7.67;
+
+	cmdShutdown.command_number = bpDrivers::commandRequest::SET_JOINT_CONFIGURATION;
+	cmdShutdown.joint1 = 0;
+	cmdShutdown.joint2 = 0;
+	cmdShutdown.joint3 = 0;
+	cmdShutdown.joint4 = 0;
+	cmdShutdown.joint5 = 0;
+	cmdShutdown.joint6 = 0;
+
+	bpDrivers::commandRequest temp;
+	temp.command_number = bpDrivers::commandRequest::SET_TOOL_FLANGE_CARTESIAN_POSITION;
+	temp.x = 0.480*M2MM;
+	temp.y = -0.066*M2MM;
+	temp.z = -0.072*M2MM;
+	temp.theta_x = 0;
+	temp.theta_y = 150;
+	temp.theta_z = 0;
+
+	cmdOrder.push_back(temp);
+
+	temp.command_number = bpDrivers::commandRequest::SET_TOOL_FLANGE_CARTESIAN_POSITION;
+	temp.x = 0.480*M2MM;
+	temp.y = 0.030*M2MM;
+	temp.z = -0.072*M2MM;
+	temp.theta_x = 0;
+	temp.theta_y = 150;
+	temp.theta_z = 0;
+
+	cmdOrder.push_back(temp);
+
+	temp.command_number = bpDrivers::commandRequest::SET_TOOL_FLANGE_CARTESIAN_POSITION;
+	temp.x = 0.480*M2MM;
+	temp.y = 0.130*M2MM;
+	temp.z = -0.072*M2MM;
+	temp.theta_x = 0;
+	temp.theta_y = 150;
+	temp.theta_z = 0;
+
+	cmdOrder.push_back(temp);
+
+	temp.command_number = bpDrivers::commandRequest::SET_TOOL_FLANGE_CARTESIAN_POSITION;
+	temp.x = 0.544*M2MM;
+	temp.y = -0.066*M2MM;
+	temp.z = -0.072*M2MM;
+	temp.theta_x = 0;
+	temp.theta_y = 150;
+	temp.theta_z = 0;
+
+	cmdOrderDropoff.push_back(temp);
+
+	temp.command_number = bpDrivers::commandRequest::SET_TOOL_FLANGE_CARTESIAN_POSITION;
+	temp.x = 0.544*M2MM;
+	temp.y = 0.030*M2MM;
+	temp.z = -0.072*M2MM;
+	temp.theta_x = 0;
+	temp.theta_y = 150;
+	temp.theta_z = 0;
+
+	cmdOrderDropoff.push_back(temp);
+
+	temp.command_number = bpDrivers::commandRequest::SET_TOOL_FLANGE_CARTESIAN_POSITION;
+	temp.x = 0.544*M2MM;
+	temp.y = 0.130*M2MM;
+	temp.z = -0.072*M2MM;
+	temp.theta_x = 0;
+	temp.theta_y = 150;
+	temp.theta_z = 0;
+
+	cmdOrderDropoff.push_back(temp);
+
+	cmdCloseGripper.command_number = bpDrivers::commandRequest::SET_VALVE1;
+	cmdCloseGripper.output_state = true;
+
+	cmdOpenGripper.command_number = bpDrivers::commandRequest::SET_VALVE1;
+	cmdOpenGripper.output_state = false;
+
+}
+
+void brickHandler(bpMsgs::robot_pick msg)
+{
+	msg.header.stamp = ros::Time::now();
+	msg.header.stamp -= ros::Duration(5);
+
+	pending_bricks.push_back(msg);
+	belt_speed = msg.belt_speed;
+	ROS_INFO("Brick received. Bricks pending: %d", pending_bricks.size());
+}
+
+bool calcPositions(bpMsgs::robot_pick& brick)
+{
+	double x = brick.x;
+	double angle = brick.angle;
+
+	double y = brick.y + belt_speed * ( ros::Time::now().toSec() - brick.header.stamp.toSec() );
+
+	if ((y + time_to_pick * belt_speed) < robot_min_y)
+	{
+		brick.header.stamp = ros::Time::now() + ros::Duration((robot_min_y - y) / belt_speed);
+		y = robot_min_y;
+	}
+	else
+	{
+		y += time_to_pick * belt_speed;
+		brick.header.stamp = ros::Time::now() + ros::Duration(time_to_pick);
+	}
+
+	if (x < robot_min_x || x > robot_max_x || y < robot_min_y || y > robot_max_y)
+		return false;
+
+	ROS_INFO("X: %f, Y: %f, Time: %f", x, y, brick.header.stamp.toSec());
+
+	// Calculate y-Angle offset
+	double theta_y_offset = (x - 0.35) / (robot_max_x - robot_min_x)*2.0*12.0;
+	if (theta_y_offset < 0)
+		theta_y_offset = -180.0 - theta_y_offset;
+	else
+		theta_y_offset = 180.0 - theta_y_offset;
+
+	// Calculate Z
+	double z_pickup = (1.2963*pow(x,2.0) - 0.8685*x - 0.0738);
+
+	ROS_INFO("Theta: %f, Z: %f", theta_y_offset, z_pickup);
+
+	cmdWaitPosition.command_number = bpDrivers::commandRequest::SET_TOOL_FLANGE_CARTESIAN_POSITION;
+	cmdWaitPosition.x = x*M2MM;
+	cmdWaitPosition.y = y*M2MM;
+	cmdWaitPosition.z = (z_pickup + 0.03)*M2MM;
+	cmdWaitPosition.theta_x = 0;
+	cmdWaitPosition.theta_y = theta_y_offset;
+	cmdWaitPosition.theta_z = brick.angle;
+
+	cmdGripPosition.command_number = bpDrivers::commandRequest::SET_TOOL_FLANGE_CARTESIAN_POSITION;
+	cmdGripPosition.x = x*M2MM;
+	cmdGripPosition.y = y*M2MM;
+	cmdGripPosition.z = z_pickup*M2MM;
+	cmdGripPosition.theta_x = 0;
+	cmdGripPosition.theta_y = theta_y_offset;
+	cmdGripPosition.theta_z = brick.angle;
+
+	return true;
+}
 
 int main(int argc, char **argv)
 {
-  /* ros messages */
+	pending_bricks = std::vector<bpMsgs::robot_pick>();
 
-  /* parameters */
-  std::string plc_serial_tx_publisher_topic;
-  std::string plc_serial_rx_subscriber_topic;
-  std::string plc_command_service_name;
+	/* ros messages */
+	bpDrivers::commandRequest cmdReq;
+	bpDrivers::commandResponse cmdRes;
 
-  /* initialize ros usage */
-  ros::init(argc, argv, "robot_motion_controller");
+	/* parameters */
+	std::string brick_subscriber_topic;
+	std::string brick_publisher_topic;
+	int loop_rate_param;
 
-  /* private nodehandlers */
-  ros::NodeHandle nh;
-  ros::NodeHandle n("~");
+	/* initialize ros usage */
+	ros::init(argc, argv, "robot_motion_controller");
+	ros::Publisher brick_publisher;
+	ros::Subscriber brick_subscriber;
 
-  /* read parameters from ros parameter server if available otherwise use default values */
-  n.param<std::string> ("plc_serial_tx_publisher_topic", plc_serial_tx_publisher_topic, "S0_rx_msg");
-  n.param<std::string> ("plc_serial_rx_subscriber_topic", plc_serial_rx_subscriber_topic, "S0_tx_msg");
-  n.param<std::string> ("plc_command_service_name", plc_command_service_name, "plc_command");
+	/* private nodehandlers */
+	ros::NodeHandle nh;
+	ros::NodeHandle n("~");
 
-  bpDrivers::commandRequest cmdGoHome;
-  cmdGoHome.command_number = bpDrivers::commandRequest::SET_JOINT_CONFIGURATION;
-  cmdGoHome.joint1 = 0;
-  cmdGoHome.joint2 = 0;
-  cmdGoHome.joint3 = 0;
-  cmdGoHome.joint4 = 0;
-  cmdGoHome.joint5 = 0;
-  cmdGoHome.joint6 = 0;
+	/* read parameters from ros parameter server if available otherwise use default values */
+	n.param<std::string> ("brick_subscriber_topic", brick_subscriber_topic, "/bpRobotMotionController/brick_command_topic");
+	n.param<std::string> ("brick_publisher_topic", brick_publisher_topic, "/bpRobotMotionController/brick_response_topic");
+	n.param<int> ("loop_rate", loop_rate_param, 1);
 
-  bpDrivers::commandRequest cmdIdle;
-  cmdIdle.command_number = bpDrivers::commandRequest::SET_JOINT_CONFIGURATION;
-  cmdIdle.joint1 = 0;
-  cmdIdle.joint2 = 45;
-  cmdIdle.joint3 = 90;
-  cmdIdle.joint4 = 0;
-  cmdIdle.joint5 = 45;
-  cmdIdle.joint6 = 90;
 
-  bpDrivers::commandRequest cmdPickup;
-  cmdPickup.command_number = bpDrivers::commandRequest::SET_TOOL_FLANGE_CARTESIAN_POSITION;
-  cmdPickup.x = 415;
-  cmdPickup.y = 0;
-  cmdPickup.z = -75;
-  cmdPickup.theta_x = 0;
-  cmdPickup.theta_y = 180;
-  cmdPickup.theta_z = 90;
+	brick_publisher = nh.advertise<bpMsgs::robot_pick> (brick_publisher_topic.c_str(), 20,1);
+	brick_subscriber = nh.subscribe<bpMsgs::robot_pick> (brick_subscriber_topic.c_str(), 20, brickHandler);
 
-  bpDrivers::commandRequest cmdDropoff;
-  cmdDropoff.command_number = bpDrivers::commandRequest::SET_TOOL_FLANGE_CARTESIAN_POSITION;
-  cmdDropoff.x = 600;
-  cmdDropoff.y = 0;
-  cmdDropoff.z = 0;
-  cmdDropoff.theta_x = 0;
-  cmdDropoff.theta_y = 135;
-  cmdDropoff.theta_z = 0;
+	setKnownConfs();
 
-  ros::Rate loop_rate(10);
+	ros::ServiceClient robot_client = n.serviceClient<bpDrivers::command>("/bpDrivers/rx60_controller/rx60_command");
+	std::cout << "RobotMotionPlanner node started! - waiting for RX60 controller service" << std::endl;
+	robot_client.waitForExistence();
+	std::cout << "RX60 controller service found! - Going to idle position" << std::endl;
 
-  ros::ServiceClient client = n.serviceClient<bpDrivers::command>("/bpDrivers/rx60_controller/rx60_command");
+	state robot_state = idle;
 
-  std::cout << "RobotMotionPlanner node started! - waiting for RX60 controller service" << std::endl;
+	// Go to Idle position
+	robot_client.call(cmdIdle,cmdRes);
+	robot_client.call(cmdOpenGripper, cmdRes);
 
-  client.waitForExistence();
+	bpMsgs::robot_pick brickToPick;
+	bpMsgs::robot_pick returnMessage;
 
-  std::cout << "RX60 controller service found! - Going to idle position" << std::endl;
+	ros::Rate loop_rate(loop_rate_param);
+	while (ros::ok())
+	{
+		ros::spinOnce();
 
-  bpDrivers::commandRequest cmdReq;
-  bpDrivers::commandResponse cmdRes;
-
-  int move = 0;
-
-  while (ros::ok())
-  {
-    ros::spinOnce();
-
-    // check if robot is settled
-    cmdReq.command_number = bpDrivers::commandRequest::IS_SETTLED;
-    client.call(cmdReq,cmdRes);
-
-    if (cmdRes.is_settled)
-    {
-        cmdReq.command_number = bpDrivers::commandRequest::GET_TOOL_FLANGE_POSITION;
-        client.call(cmdReq,cmdRes);
-        std::cout << "Robot settled!! at pos: X: " << cmdRes.x << " Y: " << cmdRes.y << " Z: " << cmdRes.z << std::endl;
-        switch (move) {
-			case 0:
-				  client.call(cmdIdle,cmdRes);
-				  move = 1;
+		switch (robot_state) {
+			case idle:
+				//ROS_INFO("IDLE");
+				if (pending_bricks.size() > 0)
+				{
+					brickToPick = pending_bricks[0];
+					pending_bricks.erase(pending_bricks.begin());
+					if (!calcPositions(brickToPick))
+					{
+						// Cant reach brick
+						robot_state = failed;
+					}
+					else
+					{
+						robot_client.call(cmdWaitPosition,cmdRes);
+						robot_state = wait_for_wait_position;
+						ros::Duration(0.1).sleep();
+					}
+				}
+				else
+				{
+					robot_client.call(cmdIdle,cmdRes);
+				}
 				break;
-			case 1:
-				  ros::Duration(0.5).sleep();
-				  cmdPickup.z = -75;
-				  cmdPickup.y = -200 + (double)rand()/((double)RAND_MAX/(200+200));
-				  client.call(cmdPickup,cmdRes);
-				  cmdPickup.z = -150;
-				  client.call(cmdPickup,cmdRes);
-				  move = 2;
+			case wait_for_wait_position:
+				ROS_INFO("wait_for_wait_position");
+				cmdReq.command_number = bpDrivers::commandRequest::IS_SETTLED;
+				robot_client.call(cmdReq,cmdRes);
+				if (cmdRes.is_settled)
+				{
+					robot_state = go_down_to_pick_brick;
+				}
 				break;
-			case 2:
-				  ros::Duration(0.5).sleep();
-				  cmdPickup.z = -75;
-				  client.call(cmdPickup,cmdRes);
-				  client.call(cmdDropoff,cmdRes);
-				  move = 1;
+
+			case go_down_to_pick_brick:
+				ROS_INFO("go_down_to_pick_brick");
+				if (brickToPick.header.stamp.toSec() < (ros::Time::now().toSec() + 1.5) )
+				{
+					ROS_INFO("Go down to brick: to late");
+					robot_state = failed;
+				}
+				else if ( (ros::Time::now().toSec() - brickToPick.header.stamp.toSec()) > -2.0)
+				{
+					robot_client.call(cmdGripPosition,cmdRes);
+					robot_state = wait_for_grip_position;
+					ros::Duration(0.1).sleep();
+				}
 				break;
+
+			case wait_for_grip_position:
+				ROS_INFO("wait_for_grip_position");
+				cmdReq.command_number = bpDrivers::commandRequest::IS_SETTLED;
+				robot_client.call(cmdReq,cmdRes);
+				if (cmdRes.is_settled)
+				{
+					robot_state = wait_for_brick;
+				}
+				break;
+
+			case wait_for_brick:
+				ROS_INFO("wait_for_brick");
+				if (brickToPick.header.stamp.toSec() < (ros::Time::now().toSec() + 0.5) )
+				{
+					robot_client.call(cmdCloseGripper,cmdRes);
+					ros::Duration(0.2).sleep();
+					robot_state = go_to_delivery_position;
+				}
+				break;
+
+			case go_to_delivery_position:
+				ROS_INFO("go_to_delivery_position");
+				robot_client.call(cmdOrder[brickToPick.order-1],cmdRes);
+				robot_client.call(cmdOrderDropoff[brickToPick.order-1],cmdRes);
+				//robot_state = wait_for_delivery_position;
+				robot_state = wait_for_delivery_position;
+				ros::Duration(0.1).sleep();
+				break;
+
+			case wait_for_delivery_position:
+				ROS_INFO("wait_for_dropoff_position");
+				cmdReq.command_number = bpDrivers::commandRequest::IS_SETTLED;
+				robot_client.call(cmdReq,cmdRes);
+				if (cmdRes.is_settled)
+				{
+					robot_client.call(cmdOpenGripper,cmdRes);
+					ros::Duration(0.3).sleep();
+					robot_state = go_to_safe_position;
+				}
+				break;
+
+			case go_to_safe_position:
+				ROS_INFO("go_to_safe_position");
+				robot_client.call(cmdOrder[brickToPick.order-1],cmdRes);
+				ros::Duration(0.1).sleep();
+				robot_state = wait_for_safe_position;
+				break;
+
+			case wait_for_safe_position:
+				ROS_INFO("wait_for_safe_position");
+				cmdReq.command_number = bpDrivers::commandRequest::IS_SETTLED;
+				robot_client.call(cmdReq,cmdRes);
+				if (cmdRes.is_settled)
+				{
+					robot_state = succeded;
+				}
+				break;
+
+			case succeded:
+				ROS_INFO("Successfully delivered brick");
+				returnMessage = brickToPick;
+				returnMessage.succes = true;
+				brick_publisher.publish(returnMessage);
+				robot_state = idle;
+				break;
+
+			case failed:
+				ROS_INFO("ERROR cant reach brick");
+				returnMessage = brickToPick;
+				returnMessage.succes = false;
+				brick_publisher.publish(returnMessage);
+				robot_state = idle;
+				break;
+
+
 			default:
 				break;
 		}
-    }
-    else
-    {
-        cmdReq.command_number = bpDrivers::commandRequest::GET_TOOL_FLANGE_POSITION;
-        client.call(cmdReq,cmdRes);
-        std::cout << "Robot Moving!! at pos: X: " << cmdRes.x << " Y: " << cmdRes.y << " Z: " << cmdRes.z << std::endl;
-    }
+		// check if robot is settled
+		//cmdReq.command_number = bpDrivers::commandRequest::IS_SETTLED;
+		//client.call(cmdReq,cmdRes);
 
+		//if (cmdRes.is_settled);
 
-    loop_rate.sleep();
-  }
+		loop_rate.sleep();
+	}
 
-  return 0;
+	return 0;
 }
 
