@@ -166,7 +166,7 @@ def execute():
                 brickToPick.belt_speed = belt_speed
                 brickToPick.x = bestBrick.x
                 brickToPick.y = bestBrick.y + belt_speed * (rospy.Time.now().to_sec() - bestBrick.header.stamp.to_sec())
-                brickToPick.angle = bestBrick.angle
+                brickToPick.angle = 0 #bestBrick.angle
                 brickToPick.id = bestBrick.id
                 brickToPick.header.stamp = rospy.Time.now()
                 brickToPick.type = bestBrick.type
@@ -215,9 +215,9 @@ def brickCallback(msg):
             brickAlreadyExists = True
     if not brickAlreadyExists:
         # For debug purpose
-        msg.header.stamp = rospy.Time.now()
+        # msg.header.stamp = rospy.Time.now()
         msg.x += offset_x
-        msg.y += offset_y
+        msg.y -= offset_y
         bricks.append(msg)
 
 def orderHandler():

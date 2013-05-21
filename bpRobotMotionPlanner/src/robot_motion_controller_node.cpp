@@ -191,6 +191,8 @@ bool calcPositions(bpMsgs::robot_pick& brick)
 
 	// Calculate Z
 	double z_pickup = (1.2963*pow(x,2.0) - 0.8685*x - 0.0738);
+	if (y < 0)
+	   z_pickup += 0.003;
 
 	ROS_INFO("Theta: %f, Z: %f", theta_y_offset, z_pickup);
 
@@ -205,7 +207,7 @@ bool calcPositions(bpMsgs::robot_pick& brick)
 	cmdGripPosition.command_number = bpDrivers::commandRequest::SET_TOOL_FLANGE_CARTESIAN_POSITION;
 	cmdGripPosition.x = x*M2MM;
 	cmdGripPosition.y = y*M2MM;
-	cmdGripPosition.z = z_pickup*M2MM;
+	cmdGripPosition.z = (z_pickup - 0.003)*M2MM;
 	cmdGripPosition.theta_x = 0;
 	cmdGripPosition.theta_y = theta_y_offset;
 	cmdGripPosition.theta_z = brick.angle;
@@ -326,7 +328,7 @@ int main(int argc, char **argv)
 
 			case wait_for_brick:
 				ROS_INFO("wait_for_brick");
-				if (brickToPick.header.stamp.toSec() < (ros::Time::now().toSec() + 0.5) )
+				if (brickToPick.header.stamp.toSec() < (ros::Time::now().toSec() - 0.25) )
 				{
 					robot_client.call(cmdCloseGripper,cmdRes);
 					ros::Duration(0.2).sleep();

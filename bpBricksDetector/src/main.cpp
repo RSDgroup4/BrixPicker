@@ -40,7 +40,8 @@ int huered1,saturationred1,valuered1,hueyellow1,saturationyellow1,valueyellow1,h
 int huered1L,saturationred1L,valuered1L,hueyellow1L,saturationyellow1L,valueyellow1L,hueblue1L,saturationblue1L,valueblue1L;
 int randomst = 255;
 
-double pixel_m = 1161.0771;
+//double pixel_m = 1161.0771;
+double pixel_m = 2460;
 
 int counter = 0;
 int brick_id = 0;
@@ -60,7 +61,7 @@ void HSVToBW(const Mat &imgSrc, Mat &imgDst, int a)
 		// Iterate over the elements in the current line
 	    for(int j = 0 ; j < imgSrc.cols ; j++ )
     	{
-	    	if (j < 100 || j > 500) {
+	    	if (j < 0 || j > 640) {
 	    				imgDst.data[i*imgDst.cols+j] = 0;
 	    	}
 	    	else {
@@ -311,8 +312,6 @@ void imageCallback(const sensor_msgs::ImageConstPtr& original_image)
 				// brick.x = minRect[i].center.x;
 				// brick.y = minRect[i].center.y;
 
-				ROS_INFO("Contour found! - Area: %ld Center x: %f  y: %f  Orientation: %ld", (long int)area, (float)difference_x, (float)difference_y, (long int)_ma[i]);
-
 				bpMsgs::brick tmpBrick;
 				tmpBrick.header.stamp.sec = original_image->header.stamp.sec;
 				tmpBrick.header.stamp.nsec = original_image->header.stamp.nsec;
@@ -326,26 +325,29 @@ void imageCallback(const sensor_msgs::ImageConstPtr& original_image)
 				else if (area > 2100 && area < 3000){
 				   tmpBrick.type = 1;
 				}
-				else if(area > 4000 && area < 6000){
+				else if(area > 4000 && area < 6500){
 				   tmpBrick.type = 3;
 				}
 				else{
 				   tmpBrick.type = 0;
 				}
+				ROS_INFO("Area: %ld x: %f, xp %ld,  y: %f, yp: %ld  Orient: %ld, type %d", (long int)area, (float)difference_x, (long int)minRect[i].center.x, (float)difference_y, (long int)minRect[i].center.y, (long int)_ma[i], tmpBrick.type);
+
 
 				bool oldBrick = false;
 				for (int i = 0; i < bricks.size(); i++)
 				{
 					// Check if the brick is already known
-					if (abs(tmpBrick.x - bricks[i].back().x) < 0.01 && ((tmpBrick.y - bricks[i].back().y) > 0.005 && (tmpBrick.y - bricks[i].back().y) < 0.03) && tmpBrick.type == bricks[i].back().type )
+					if (abs(tmpBrick.x - bricks[i].back().x) < 0.01 && ((tmpBrick.y - bricks[i].back().y) > 0.003 && (tmpBrick.y - bricks[i].back().y) < 0.02) && tmpBrick.type == bricks[i].back().type )
 					{
 						ROS_INFO("The same brick!");
 						oldBrick = true;
 						// last time we detect it - publish it!
-						if (tmpBrick.y > 0.2)
+						if (tmpBrick.y > 0.13)
 						{
 							tmpBrick.id = brick_id++;
 							brick_pub.publish(tmpBrick);
+							ROS_INFO("Brick published");
 							bricks.erase(bricks.begin()+i);
 						}
 						// adding the brick to its predecessors vector
@@ -355,9 +357,14 @@ void imageCallback(const sensor_msgs::ImageConstPtr& original_image)
 						}
 
 					}
+					else if (ros::Time::now().toSec() - bricks[i].front().header.stamp.toSec() > 10)
+					{
+						bricks.erase(bricks.begin()+i);
+						i--;
+					}
 				}
 				// Check if it is a new brick
-				if (tmpBrick.y < 0.2 && tmpBrick.y > 0.05 && !oldBrick)
+				if (tmpBrick.y < 0.13 && tmpBrick.y > 0.03 && !oldBrick)
 				{
 					ROS_INFO("New Brick Found!");
 					vector< bpMsgs::brick > tmpBrickVec;
@@ -409,7 +416,7 @@ int main(int argc, char **argv)
 	ros::NodeHandle nh;
 	//Create an ImageTransport instance, initializing it with our NodeHandle.
 	image_transport::ImageTransport it(nh);
-	brick_pub = nh.advertise<bpMsgs::brick>("brick_pub", 10);
+	brick_pub = nh.advertise<bpMsgs::brick>("/bpBrickDetector/bricks", 10);
 
 	cv::namedWindow("image processed", CV_WINDOW_NORMAL);
 	cv::namedWindow("contours", CV_WINDOW_NORMAL);
