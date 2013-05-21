@@ -7,7 +7,7 @@ int32 status
 string time
 int32 order_tray
 int32 order_id
-int32 order_ticket
+string order_ticket
 int32 red_bricks
 int32 yellow_bricks
 int32 blue_bricks

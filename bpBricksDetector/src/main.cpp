@@ -343,7 +343,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& original_image)
 						ROS_INFO("The same brick!");
 						oldBrick = true;
 						// last time we detect it - publish it!
-						if (tmpBrick.y > 0.13)
+						if (tmpBrick.y > 0.13 && bricks[i].size() >= 5)
 						{
 							tmpBrick.id = brick_id++;
 							brick_pub.publish(tmpBrick);
