@@ -9,6 +9,7 @@ from std_msgs.msg import String
 from bpMsgs.msg import brick
 from bpMsgs.msg import system_state
 from bpMsgs.msg import robot_pick
+from bpMsgs.msg import oee_data
 from bpMessy2Controller.srv import *
 from dynamic_reconfigure.server import Server
 from bpOrderHandler.cfg import offset_paramsConfig
@@ -30,9 +31,14 @@ offset_y = 0
 belt_speed = 0
 take_order = False
 robot_publisher = 0
+logPublisher = 0
+orderDataPublisher = 0
+
 take_all_bricks = False
 robot_queue = 0;
 dataLock = threading.Lock()
+ordersDone = 0
+totalOrders = 0
 
 def dynamic_reconfiguration_callback(config, level):
     global offset_x
@@ -120,9 +126,13 @@ def execute():
                 else:
                     order_ticket = "null"
                 if order_ticket != 0:
+                    global totalOrders
+                    totalOrders += 1
                     myOrder.order_ticket = order_ticket
+                    myOrder.order_tray = 1 #TODO fix!
                     myOrder.header.stamp = rospy.Time.now()
                     bricksRemaining = (myOrder.blue_bricks + myOrder.red_bricks + myOrder.yellow_bricks)
+                    logPublisher.publish("Order #%d started in tray %d - ticket: \"%s\" at time: %s" % (myOrder.id, myOrder.order_tray, myOrder.order_ticket, myOrder.header.stamp))
                     rospy.loginfo("ID: %d, ticket: %s, time: %s" % (myOrder.order_id, myOrder.order_ticket, myOrder.header.stamp))
                     rospy.loginfo("New order chosen with id: %d - blue: %d, red %d, yellow %d" % (myOrder.order_id, myOrder.blue_bricks, myOrder.red_bricks, myOrder.yellow_bricks))
                     break
@@ -131,14 +141,19 @@ def execute():
     elif myOrder.blue_bricks == 0 and myOrder.red_bricks == 0 and myOrder.yellow_bricks == 0 and bricksRemaining <= 0:
         rospy.loginfo("Order #%d done" % myOrder.order_id)
         if finishOrder(myOrder):
+            global ordersDone
+            ordersDone += 1
+            logPublisher.publish("Order #%d done! in tray %d" % (myOrder.order_id, myOrder.order_tray))
             rospy.loginfo("Order finished succesfully")
         else:
             rospy.loginfo("Sending finish request failed")
+            logPublisher.publish("Order #%d done, but failed to be confirmed by MessyServer! in tray %d" % (myOrder.order_id, myOrder.order_tray))
         myOrder = 0
     
     # Check if order is to old (Over 3 minuts)
     elif rospy.Time.now().secs - myOrder.header.stamp.secs > 180:
-        rospy.loginfo("Order #%d now done in time..! Order is being discarded" % myOrder.order_id)
+        rospy.loginfo("Order #%d not done in time..! Order is being discarded" % myOrder.order_id)
+        logPublisher.publish("Order #%d not done in time..! Order is being discarded" % myOrder.order_id)
         myOrder = 0
     
     # Find brick to pick
@@ -162,7 +177,7 @@ def execute():
              
             if bestBrick != -1:
                 brickToPick = robot_pick()
-                brickToPick.order = 1 #TODO: fix ordershit
+                brickToPick.order = myOrder.order_tray
                 brickToPick.belt_speed = belt_speed
                 brickToPick.x = bestBrick.x
                 brickToPick.y = bestBrick.y + belt_speed * (rospy.Time.now().to_sec() - bestBrick.header.stamp.to_sec())
@@ -180,6 +195,8 @@ def execute():
                     myOrder.yellow_bricks -= 1
                 elif brickToPick.type == brickToPick.BLUE:
                     myOrder.blue_bricks -= 1
+                orderDataPublisher(myOrder)
+                
 
         rospy.loginfo("Remaining: blue: %d, yellow: %d, red: %d - BricksInSys: %d - PicksRemain: %d" % (myOrder.blue_bricks, myOrder.yellow_bricks, myOrder.red_bricks, len(bricks), bricksRemaining))
         
@@ -254,11 +271,37 @@ def orderHandler():
     
     global robot_queue
     robot_queue = 0
+    
+    # Add publisher for the OEE data
+    counter = 0 # counter for slowing down the calculations
+    oeeDataPubTopic = rospy.get_param("~oee_data_publisher_topic", "/oee")
+    oeeDataPublisher = rospy.Publisher(oeeDataPubTopic, oee_data)
+    
+    # timers for the OEE calculations
+    TotalRuntime = 0
+    ProductionTime = 0
+    idealOrderTime = 45
+    
+    # System state publisher for the GUI
+    systemStatePubTopic = rospy.get_param("~system_state_publisher_topic", "/bpOrderHandler/system_state")
+    systemStatePublisher = rospy.Publisher(systemStatePubTopic, system_state)
+   
+    # Log publisher 
+    logPubTopic = rospy.get_param("~log_publisher_topic", "/log")
+    global logPublisher
+    logPublisher = rospy.Publisher(logPubTopic, String)
+    
+    # Order data publisher
+    orderDataPubTopic = rospy.get_param("~order_data_publisher_topic", "/bpOrderHandler/order_status")
+    global orderDataPublisher 
+    orderDataPublisher = rospy.Publisher(orderDataPubTopic, order)
+    
     # End of Init
     
     
     # PML statemachine loop
     while not rospy.is_shutdown():
+        TotalRuntime += 1.0/loop_rate
         if hasStateChanged():
             rospy.loginfo("System state changed from %d to %d" % (state.state, next_state.state))
             state.state = next_state.state       
@@ -267,6 +310,7 @@ def orderHandler():
             rospy.loginfo("PML_IDLE")
         elif state.state == state.PML_EXECUTE:
             execute()
+            ProductionTime += 1.0/loop_rate
         elif state.state == state.PML_COMPLETE:
             rospy.loginfo("PML_COMPLETE")
         elif state.state == state.PML_HELD:
@@ -277,6 +321,20 @@ def orderHandler():
             rospy.loginfo("PML_ABORTED")
         elif state.state == state.PML_STOPPED:
             rospy.loginfo("PML_STOPPED")
+            
+        # Calculate and publish data for GUI
+        counter += 1
+        if (counter > loop_rate): #Runs once a second
+            counter = 0
+            # OEE data
+            oeeData = oee_data()
+            oeeData.availability = (TotalRuntime / ProductionTime)
+            oeeData.performance = ((idealOrderTime * ordersDone) / ProductionTime)
+            oeeData.quality = ordersDone / (totalOrders + 0.00001)
+            oeeData.oee = oeeData.availability*oeeData.performance*oeeData.quality
+            oeeDataPublisher.publish(oeeData)       
+            #System state
+            systemStatePublisher.publish(state)
         
         rospy.sleep(1.0/loop_rate)
         
