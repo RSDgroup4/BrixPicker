@@ -27,11 +27,25 @@ double oldarea = 0;
 int thresh = 100;
 int max_thresh = 255;
 RNG rng(12345);
-int huered,saturationred,valuered,hueyellow,saturationyellow,valueyellow,hueblue,saturationblue,valueblue;
-int hueredL,saturationredL,valueredL,hueyellowL,saturationyellowL,valueyellowL,hueblueL,saturationblueL,valueblueL;
+// High threshold values
+int huered(255), 	saturationred(255), 	valuered(255);
+int hueyellow(48), 	saturationyellow(152), 	valueyellow(255);
+int hueblue(170), 	saturationblue(255), 	valueblue(106);
+// low threshold values
+int hueredL(211), 	saturationredL(141), 	valueredL(87);
+int hueyellowL(10), saturationyellowL(16), 	valueyellowL(184);
+int hueblueL(117),	saturationblueL(143),	valueblueL(45);
+
 int huered1,saturationred1,valuered1,hueyellow1,saturationyellow1,valueyellow1,hueblue1,saturationblue1,valueblue1;
 int huered1L,saturationred1L,valuered1L,hueyellow1L,saturationyellow1L,valueyellow1L,hueblue1L,saturationblue1L,valueblue1L;
 int randomst = 255;
+
+double pixel_m = 1161.0771;
+
+int counter = 0;
+int brick_id = 0;
+
+vector< vector<bpMsgs::brick> > bricks;
 
 //Use method of ImageTransport to create image publisher
 image_transport::Publisher pub;
@@ -46,7 +60,7 @@ void HSVToBW(const Mat &imgSrc, Mat &imgDst, int a)
 		// Iterate over the elements in the current line
 	    for(int j = 0 ; j < imgSrc.cols ; j++ )
     	{
-	    	if (i < 100 || j < 100 || j > 500) {
+	    	if (j < 100 || j > 500) {
 	    				imgDst.data[i*imgDst.cols+j] = 0;
 	    	}
 	    	else {
@@ -151,51 +165,8 @@ void HSVToBW(const Mat &imgSrc, Mat &imgDst, int a)
 					imgDst.data[i*imgDst.cols+j] = 0;
 				}
 
-		/*	if ( (bH > huered1L && bH <= huered1) && (bH > hueyellow1L && bH <= hueyellow1) && (bH > hueblue1L && bH <= hueblue1) ) {
-				imgDst.data[i*imgDst.cols+j] = 255;
-			}
 
-			else if ((bS > saturationred1L && bS <= saturationred1)&&(bS > saturationyellow1L && bS <= saturationyellow1)&&(bS > saturationblue1L && bS <= saturationblue1)) {
-				imgDst.data[i*imgDst.cols+j] = 255;
-			}
-
-			else if (( bV > valuered1L && bV <= valuered1)&& (bV > valueyellow1L && bV <= valueyellow1)&&(bV > valueblue1L && bV <= valueblue1)) {
-				imgDst.data[i*imgDst.cols+j] = 255;
-			}
-
-			else {
-				imgDst.data[i*imgDst.cols+j] = 0;
-			}
-*/
-
-
-
-			/*	if (bS > 10 && bS <= 120 && bH > 0 && bH <= 100  && bV > 0 && bV <= 150 && a == 1) {
-					imgDst.data[i*imgDst.cols+j] = 255;
-				//	imgDst.at<T>(i,j) = 1;
-					//cout << "hellos1" <<  endl;
-				}
-				else if (bS > 90 && bS <= 255 && bH > 0 && bH <= 255  && bV > 0 && bV <= 255 && a == 2)
-	            {	imgDst.data[i*imgDst.cols+j] = 255;
-	            //	imgDst.at<T>(i,j) = 1;
-	            //	cout << "hellos2" <<  endl;
-	            }
-	    	    else if(bS > 0 && bS <= 255 && bH > 150 && bH <= 255  && bV > 0 && bV <= 255 && a == 2) {
-	    	    	imgDst.data[i*imgDst.cols+j] = 255;
-	    	    }
-	    	    else{
-	    	    	//if (bS > 0 && bS <= 255 && bH > 150 && bH <= 255  && bV > 0 && bV <= 255 && a == 2) {
-	    	    	//	imgDst.data[i*imgDst.cols+j] = 255;
-	    	    	//}
-	    	    	//cout << "hellos3" <<  endl;
-	    	    	//CV_MAT_ELEM(imgDst,float,i,j) = 0;
-	           // imgDst.at<T>(i,j) = 0;
-	    	    	imgDst.data[i*imgDst.cols+j] = 0;
-	       //     imgDst.at<T>(i,j) = 0;
-	           // cout << "hellos3" <<  endl;
-	            }
-				//imgDst.data[i*imgDst.cols+j] = 0;
-*/			}
+		}
 	        }
 	  }
 
@@ -258,35 +229,15 @@ void filter(Mat img){
 //This function is called everytime a new image is published
 void imageCallback(const sensor_msgs::ImageConstPtr& original_image)
 {
+	counter++;
+	if (counter > 2)
+		counter = 0;
+	else
+		return;
 
 	bpMsgs::brick brick;
 	brick.header.stamp.sec = original_image->header.stamp.sec;
 	brick.header.stamp.nsec = original_image->header.stamp.nsec;
-ROS_INFO("stamp sec: %ld nano: %ld", (long int)original_image->header.stamp.sec, (long int)original_image->header.stamp.nsec);
-	cv::namedWindow("trackBar", CV_WINDOW_NORMAL);
-	cv::resizeWindow("trackBar", 400, 300);
-	cv::namedWindow("trackBar2", CV_WINDOW_NORMAL);
-	cv::resizeWindow("trackBar2", 400, 300);
-
-	createTrackbar( "Huered", "trackBar", &huered, max_thresh, callback );
-	createTrackbar( "Saturationred", "trackBar", &saturationred, max_thresh, callback);
-	createTrackbar( "Valuered", "trackBar", &valuered, max_thresh, callback);
-	createTrackbar( "Hueyellow", "trackBar", &hueyellow, max_thresh, callback );
-	createTrackbar( "Saturationyellow", "trackBar", &saturationyellow, max_thresh, callback );
-	createTrackbar( "Valueyellow", "trackBar", &valueyellow, max_thresh, callback );
-	createTrackbar( "Hueblue", "trackBar", &hueblue, max_thresh, callback );
-	createTrackbar( "Saturationblue", "trackBar", &saturationblue, max_thresh, callback );
-	createTrackbar( "Valueblue", "trackBar", &valueblue, max_thresh, callback );
-
-	createTrackbar( "HueredL", "trackBar2", &hueredL, max_thresh, callback );
-	createTrackbar( "SaturationredL", "trackBar2", &saturationredL, max_thresh, callback);
-	createTrackbar( "ValueredL", "trackBar2", &valueredL, max_thresh, callback);
-	createTrackbar( "HueyellowL", "trackBar2", &hueyellowL, max_thresh, callback );
-	createTrackbar( "SaturationyellowL", "trackBar2", &saturationyellowL, max_thresh, callback );
-	createTrackbar( "ValueyellowL", "trackBar2", &valueyellowL, max_thresh, callback );
-	createTrackbar( "HueblueL", "trackBar2", &hueblueL, max_thresh, callback );
-	createTrackbar( "SaturationblueL", "trackBar2", &saturationblueL, max_thresh, callback );
-	createTrackbar( "ValueblueL", "trackBar2", &valueblueL, max_thresh, callback );
 
 	//Convert from the ROS image message to a CvImage suitable for working with OpenCV for processing
 	cv_bridge::CvImagePtr cv_ptr;
@@ -329,7 +280,7 @@ ROS_INFO("stamp sec: %ld nano: %ld", (long int)original_image->header.stamp.sec,
 	  vector<Point2f> _mc(contours.size());
 	  vector<double> _ma(contours.size());
 	  vector<RotatedRect> minRect( contours.size() );
-	  vector<RotatedRect> minEllipse( contours.size() );
+	//  vector<RotatedRect> minEllipse( contours.size() );
 
 	  for( int i = 0; i < contours.size(); i++)
 	  {
@@ -345,30 +296,74 @@ ROS_INFO("stamp sec: %ld nano: %ld", (long int)original_image->header.stamp.sec,
 			   i--;
 		   }
 		   else {
-			   minEllipse[i] = fitEllipse( contours[i] );
+				//   minEllipse[i] = fitEllipse( contours[i] );
 
-		   _mu[i] = moments( Mat(contours[i]), false );
-		 //  _mu[i] = moments( Mat(minRect[i]), false );
-		   _mc[i] = Point2f( _mu[i].m10/_mu[i].m00 , _mu[i].m01/_mu[i].m00);
-		   _ma[i] = (0.5*atan2(2*_mu[i].mu11,_mu[i].mu20-_mu[i].mu02))*180/M_PI;
-		   ROS_INFO("Contour no: %ld Area: %ld Center x: %ld  y: %ld  Orientation: %ld ", (long int)i,(long int)area,(long int)_mc[i].x, (long int)_mc[i].y, (long int)_ma[i]);
-		   ROS_INFO("Contour no: %ld Area: %ld Center x: %ld  y: %ld  Orientation: %ld ", (long int)i,(long int)area,(long int)minRect[i].center.x, (long int)minRect[i].center.y, (long int)minRect[i].angle);
-		   brick.angle = _ma[i];
-		   brick.x = minRect[i].center.x;
-		   brick.y = minRect[i].center.y;
-		   if (area > 3000 && area < 5000) {
-			   brick.type = 2;
-		   }
-		   else if (area > 7000 && area < 9000){
-			   brick.type = 1;
-		   }
-		   else if(area > 11000 && area < 13000){
-			   brick.type = 3;
-		   }
-		   else{
-			   brick.type = 0;
-		   }
-		   brick_pub.publish(brick);
+				_mu[i] = moments( Mat(contours[i]), false );
+				//  _mu[i] = moments( Mat(minRect[i]), false );
+				_mc[i] = Point2f( _mu[i].m10/_mu[i].m00 , _mu[i].m01/_mu[i].m00);
+				_ma[i] = (0.5*atan2(2*_mu[i].mu11,_mu[i].mu20-_mu[i].mu02))*180/M_PI;
+				//ROS_INFO("Contour no: %ld Area: %ld Center x: %ld  y: %ld  Orientation: %ld ", (long int)i,(long int)area,(long int)_mc[i].x, (long int)_mc[i].y, (long int)_ma[i]);
+				//ROS_INFO("Contour no: %ld Area: %ld Center x: %ld  y: %ld  Orientation: %ld ", (long int)i,(long int)area,(long int)minRect[i].center.x, (long int)minRect[i].center.y, (long int)_ma[i]);
+
+				double difference_x, difference_y;
+				difference_x = (minRect[i].center.x-320)/pixel_m;
+				difference_y = (480 - minRect[i].center.y)/pixel_m;
+				// brick.x = minRect[i].center.x;
+				// brick.y = minRect[i].center.y;
+
+				ROS_INFO("Contour found! - Area: %ld Center x: %f  y: %f  Orientation: %ld", (long int)area, (float)difference_x, (float)difference_y, (long int)_ma[i]);
+
+				bpMsgs::brick tmpBrick;
+				tmpBrick.header.stamp.sec = original_image->header.stamp.sec;
+				tmpBrick.header.stamp.nsec = original_image->header.stamp.nsec;
+				tmpBrick.x = difference_x;
+				tmpBrick.y = difference_y;
+				tmpBrick.angle = _ma[i];
+
+				if (area > 1100 && area < 1800) {
+				   tmpBrick.type = 2;
+				}
+				else if (area > 2100 && area < 3000){
+				   tmpBrick.type = 1;
+				}
+				else if(area > 4000 && area < 6000){
+				   tmpBrick.type = 3;
+				}
+				else{
+				   tmpBrick.type = 0;
+				}
+
+				bool oldBrick = false;
+				for (int i = 0; i < bricks.size(); i++)
+				{
+					// Check if the brick is already known
+					if (abs(tmpBrick.x - bricks[i].back().x) < 0.01 && ((tmpBrick.y - bricks[i].back().y) > 0.005 && (tmpBrick.y - bricks[i].back().y) < 0.03) && tmpBrick.type == bricks[i].back().type )
+					{
+						ROS_INFO("The same brick!");
+						oldBrick = true;
+						// last time we detect it - publish it!
+						if (tmpBrick.y > 0.2)
+						{
+							tmpBrick.id = brick_id++;
+							brick_pub.publish(tmpBrick);
+							bricks.erase(bricks.begin()+i);
+						}
+						// adding the brick to its predecessors vector
+						else
+						{
+							bricks[i].push_back(tmpBrick);
+						}
+
+					}
+				}
+				// Check if it is a new brick
+				if (tmpBrick.y < 0.2 && tmpBrick.y > 0.05 && !oldBrick)
+				{
+					ROS_INFO("New Brick Found!");
+					vector< bpMsgs::brick > tmpBrickVec;
+					tmpBrickVec.push_back(tmpBrick);
+					bricks.push_back(tmpBrickVec);
+				}
 		   }
 		  // cout << "Contour no: " << i << " Area: " << area << " Center x: " << _mc[i].x << " y: " << _mc[i].y << " Orientation: " << _ma[i] << endl;
 		 //  cout << "Ellipse Orientation: " << minEllipse[i].angle << endl;
@@ -397,51 +392,65 @@ ROS_INFO("stamp sec: %ld nano: %ld", (long int)original_image->header.stamp.sec,
 		         // for( int j = 0; j < 4; j++ )
 		        //            line( drawing, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
 		        }
-		     ROS_INFO("size: %d", contours.size());
-		     /// Show in a window
-		   //  namedWindow( "Contours", CV_WINDOW_AUTOSIZE );
-		   //  imshow( "Contours", drawing );
-
+		     //ROS_INFO("size: %d", contours.size());
 
 	cv::imshow("image processed", cv_ptr->image);
 	cv::imshow("contours", drawing);
-	//cv::imshow("trackBar1", imgdest);
 	cv::waitKey(3);
 	
 	//Convert the CvImage to a ROS image message and publish it on the "camera/image_processed" topic.
-        pub.publish(cv_ptr->toImageMsg());
+	pub.publish(cv_ptr->toImageMsg());
 }
 
 int main(int argc, char **argv)
 {
+	ros::init(argc, argv, "image_processor");
 	
-        ros::init(argc, argv, "image_processor");
-	
-        ros::NodeHandle nh;
+	ros::NodeHandle nh;
 	//Create an ImageTransport instance, initializing it with our NodeHandle.
-        image_transport::ImageTransport it(nh);
-        brick_pub = nh.advertise<bpMsgs::brick>("brick_pub", 10);
+	image_transport::ImageTransport it(nh);
+	brick_pub = nh.advertise<bpMsgs::brick>("brick_pub", 10);
 
 	cv::namedWindow("image processed", CV_WINDOW_NORMAL);
 	cv::namedWindow("contours", CV_WINDOW_NORMAL);
-	cv::namedWindow("trackBar", CV_WINDOW_NORMAL);
-	cv::resizeWindow("trackBar", 400, 400);
 	cv::namedWindow("grey", CV_WINDOW_NORMAL);
 
+	cv::namedWindow("TreshHigh", CV_WINDOW_NORMAL);
+	cv::resizeWindow("TreshHigh", 400, 300);
+	cv::namedWindow("TreshLow", CV_WINDOW_NORMAL);
+	cv::resizeWindow("TreshLow", 400, 300);
 
+	createTrackbar( "Red Hue", "TreshHigh", &huered, max_thresh, callback );
+	createTrackbar( "Red Saturation", "TreshHigh", &saturationred, max_thresh, callback);
+	createTrackbar( "Red Value", "TreshHigh", &valuered, max_thresh, callback);
+	createTrackbar( "Yellow Hue", "TreshHigh", &hueyellow, max_thresh, callback );
+	createTrackbar( "Yellow Saturation", "TreshHigh", &saturationyellow, max_thresh, callback );
+	createTrackbar( "Yellow Value", "TreshHigh", &valueyellow, max_thresh, callback );
+	createTrackbar( "Blue Hue", "TreshHigh", &hueblue, max_thresh, callback );
+	createTrackbar( "Blue Saturation", "TreshHigh", &saturationblue, max_thresh, callback );
+	createTrackbar( "Blue Value", "TreshHigh", &valueblue, max_thresh, callback );
 
+	createTrackbar( "Red Hue", "TreshLow", &hueredL, max_thresh, callback );
+	createTrackbar( "Red Saturation", "TreshLow", &saturationredL, max_thresh, callback);
+	createTrackbar( "Red Value", "TreshLow", &valueredL, max_thresh, callback);
+	createTrackbar( "Yellow Hue", "TreshLow", &hueyellowL, max_thresh, callback );
+	createTrackbar( "Yellow Saturation", "TreshLow", &saturationyellowL, max_thresh, callback );
+	createTrackbar( "Yellow Value", "TreshLow", &valueyellowL, max_thresh, callback );
+	createTrackbar( "Blue Hue", "TreshLow", &hueblueL, max_thresh, callback );
+	createTrackbar( "Blue Saturation", "TreshLow", &saturationblueL, max_thresh, callback );
+	createTrackbar( "Blue Value", "TreshLow", &valueblueL, max_thresh, callback );
+	callback(0,0);
 
-     //   image_transport::Subscriber sub = it.subscribe("/usb_cam/image_raw", 1, imageCallback);
-	 image_transport::Subscriber sub = it.subscribe("camera/usb_cam/image_raw", 1, imageCallback);
+//  image_transport::Subscriber sub = it.subscribe("/usb_cam/image_raw", 1, imageCallback);
+	image_transport::Subscriber sub = it.subscribe("camera/usb_cam/image_raw", 1, imageCallback);
+	pub = it.advertise("camera/image_processed", 1);
+
+	ros::spin();
+
 	cv::destroyWindow("image processed");
 	cv::destroyWindow("grey");
 	cv::destroyWindow("contours");
-	cv::destroyWindow("trackBar");
+	cv::destroyWindow("TreshLow");
+	cv::destroyWindow("TreshHigh");
 	
-        pub = it.advertise("camera/image_processed", 1);
-	
-        ros::spin();
-	
-	ROS_INFO("camera::main.cpp::No error.");
-
 }
