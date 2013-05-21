@@ -24,22 +24,27 @@ next_state = system_state()
 loop_rate = 10
 bricks = []
 myOrder = 0
-originalOrder = 0
+bricksRemaining = 0
 offset_x = 0
 offset_y = 0
 belt_speed = 0
 take_order = False
 robot_publisher = 0
+take_all_bricks = False
+robot_queue = 0;
+dataLock = threading.Lock()
 
 def dynamic_reconfiguration_callback(config, level):
     global offset_x
     global offset_y
     global belt_speed
     global take_order
+    global take_all_bricks
     offset_x = config.offset_x
     offset_y = config.offset_y
     belt_speed = config.belt_speed
     take_order = config.take_order
+    take_all_bricks = config.take_all_bricks
     return config
 
 def hasStateChanged():
@@ -100,8 +105,9 @@ def finishOrder(order):
 def execute():
     global myOrder
     global bricks
-    global originalOrder
-    rospy.loginfo("PML_EXECUTE")
+    global bricksRemaining
+    global robot_queue
+    #rospy.loginfo("PML_EXECUTE")
     # If no order set, take order
     if myOrder == 0:
         # todo: add smarter selection
@@ -116,39 +122,83 @@ def execute():
                 if order_ticket != 0:
                     myOrder.order_ticket = order_ticket
                     myOrder.header.stamp = rospy.Time.now()
-                    originalOrder = myOrder
+                    bricksRemaining = (myOrder.blue_bricks + myOrder.red_bricks + myOrder.yellow_bricks)
                     rospy.loginfo("ID: %d, ticket: %s, time: %s" % (myOrder.order_id, myOrder.order_ticket, myOrder.header.stamp))
                     rospy.loginfo("New order chosen with id: %d - blue: %d, red %d, yellow %d" % (myOrder.order_id, myOrder.blue_bricks, myOrder.red_bricks, myOrder.yellow_bricks))
                     break
-    
 
-    
     # Check if order is done
-    if myOrder.blue_bricks == 0 and myOrder.red_bricks == 0 and myOrder.yellow_bricks == 0:
+    elif myOrder.blue_bricks == 0 and myOrder.red_bricks == 0 and myOrder.yellow_bricks == 0 and bricksRemaining <= 0:
         rospy.loginfo("Order #%d done" % myOrder.order_id)
-        if finishOrder(originalOrder):
+        if finishOrder(myOrder):
             rospy.loginfo("Order finished succesfully")
         else:
             rospy.loginfo("Sending finish request failed")
-    # Find brick to pick
-    else:
-        if len(bricks) == 0:
-            rospy.loginfo("No bricks at the belt")
-        else:
-            rospy.loginfo("Bricks in system: %d" % len(bricks))
-            
-                
-                
-            
+        myOrder = 0
+    
     # Check if order is to old (Over 3 minuts)
-    if rospy.Time.now().secs - myOrder.header.stamp.secs > 180:
+    elif rospy.Time.now().secs - myOrder.header.stamp.secs > 180:
         rospy.loginfo("Order #%d now done in time..! Order is being discarded" % myOrder.order_id)
         myOrder = 0
-        originalOrder = 0
-            
+    
+    # Find brick to pick
+    elif robot_queue < 2:
+        if len(bricks) > 0:
+            bestBrick = -1
+            best_y = -10
+            for i in range(len(bricks)-1,-1,-1):
+                # check if brick is needed
+                current_y = bricks[i].y + belt_speed * (rospy.Time.now().to_sec() - bricks[i].header.stamp.to_sec())
+                # check if brick can be reached
+                if current_y < 0.1:
+                    # check if brick is closer to being out of reach
+                    if ((bricks[i].type == bricks[i].RED and myOrder.red_bricks > 0) or (bricks[i].type == bricks[i].YELLOW and myOrder.yellow_bricks > 0) or (bricks[i].type == bricks[i].BLUE and myOrder.blue_bricks > 0)):
+                        if current_y > best_y:
+                            # if so brick is best brick
+                            bestBrick = bricks[i]
+                            best_y = current_y
+                else:
+                    bricks.pop(i)
+             
+            if bestBrick != -1:
+                brickToPick = robot_pick()
+                brickToPick.order = 1 #TODO: fix ordershit
+                brickToPick.belt_speed = belt_speed
+                brickToPick.x = bestBrick.x
+                brickToPick.y = bestBrick.y + belt_speed * (rospy.Time.now().to_sec() - bestBrick.header.stamp.to_sec())
+                brickToPick.angle = bestBrick.angle
+                brickToPick.id = bestBrick.id
+                brickToPick.header.stamp = rospy.Time.now()
+                brickToPick.type = bestBrick.type
+                robot_publisher.publish(brickToPick)
+                robot_queue += 1
+                rospy.loginfo("X: %f, Y: %f, Type: %d Robot queue: %d" % (brickToPick.x, brickToPick.y, brickToPick.type, robot_queue))
+                bricks.remove(bestBrick)
+                if brickToPick.type == brickToPick.RED:
+                    myOrder.red_bricks -= 1
+                elif brickToPick.type == brickToPick.YELLOW:
+                    myOrder.yellow_bricks -= 1
+                elif brickToPick.type == brickToPick.BLUE:
+                    myOrder.blue_bricks -= 1
+
+        rospy.loginfo("Remaining: blue: %d, yellow: %d, red: %d - BricksInSys: %d - PicksRemain: %d" % (myOrder.blue_bricks, myOrder.yellow_bricks, myOrder.red_bricks, len(bricks), bricksRemaining))
+        
             
 def robotCallback(msg):
-    rospy.loginfo("TESTING")
+    global robot_queue
+    robot_queue -= 1
+    if (msg.succes):
+        global bricksRemaining
+        bricksRemaining -= 1
+    else:
+        if msg.type == msg.RED:
+            myOrder.red_bricks += 1
+        elif msg.type == msg.YELLOW:
+            myOrder.yellow_bricks += 1
+        elif msg.type == msg.BLUE:
+            myOrder.blue_bricks += 1  
+    rospy.loginfo("Brick picked, succes: %d, BricksRemaining: %d" % (msg.succes, bricksRemaining))
+    
             
 
 def changeStateCallback(msg):
@@ -164,6 +214,10 @@ def brickCallback(msg):
         if msg.id == bricks[i].id:
             brickAlreadyExists = True
     if not brickAlreadyExists:
+        # For debug purpose
+        msg.header.stamp = rospy.Time.now()
+        msg.x += offset_x
+        msg.y += offset_y
         bricks.append(msg)
 
 def orderHandler():
@@ -176,7 +230,7 @@ def orderHandler():
     global state
     state.state = state.PML_IDLE
     global next_state
-    next_state.state = state.PML_IDLE
+    next_state.state = state.PML_EXECUTE
     
     # Subscriber for external state change
     changeStateTopic = rospy.get_param("~change_state_sub_topic", "/bpOrderHandler/change_state")
@@ -187,17 +241,19 @@ def orderHandler():
     rospy.Subscriber(brickTopic, brick, brickCallback)
     
     # Publisher for the robot motion planner
-    robotplannerPubTopic = rospy.get_param("~robot_planner_pub_topic", "/bpRobotMotionControler/brick_command_topic")
+    robotplannerPubTopic = rospy.get_param("~robot_planner_pub_topic", "/bpRobotMotionController/brick_command_topic")
+    global robot_publisher
     robot_publisher = rospy.Publisher(robotplannerPubTopic, robot_pick)
     
     # Subscriber for the robot planner messages
-    robotplannerSubTopic = rospy.get_param("~robot_planner_sub_topic", "/bpRobotMotionControler/brick_response_topic")
+    robotplannerSubTopic = rospy.get_param("~robot_planner_sub_topic", "/bpRobotMotionController/brick_response_topic")
     rospy.Subscriber(robotplannerSubTopic, robot_pick, robotCallback)
     
     # Add dynamic reconfiguration server
     dyn_srv = Server(offset_paramsConfig, dynamic_reconfiguration_callback)
     
-    
+    global robot_queue
+    robot_queue = 0
     # End of Init
     
     

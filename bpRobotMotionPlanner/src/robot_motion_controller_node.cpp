@@ -34,8 +34,6 @@ double robot_max_x = 0.440;
 double robot_center_x = 0.350;
 double robot_min_y = -0.400;
 double robot_max_y = 0.400;
-double robot_z_center_pickup = -0.219;//-0.218;
-double robot_z_center_hover = -0.160;//-0.16;
 double belt_speed = 0;
 double time_to_pick = 3;
 
@@ -153,8 +151,8 @@ void setKnownConfs(void)
 
 void brickHandler(bpMsgs::robot_pick msg)
 {
-	msg.header.stamp = ros::Time::now();
-	msg.header.stamp -= ros::Duration(5);
+	//msg.header.stamp = ros::Time::now();
+	//msg.header.stamp -= ros::Duration(5);
 
 	pending_bricks.push_back(msg);
 	belt_speed = msg.belt_speed;
@@ -243,7 +241,7 @@ int main(int argc, char **argv)
 	n.param<int> ("loop_rate", loop_rate_param, 1);
 
 
-	brick_publisher = nh.advertise<bpMsgs::robot_pick> (brick_publisher_topic.c_str(), 20,1);
+	brick_publisher = nh.advertise<bpMsgs::robot_pick> (brick_publisher_topic.c_str(), 1);
 	brick_subscriber = nh.subscribe<bpMsgs::robot_pick> (brick_subscriber_topic.c_str(), 20, brickHandler);
 
 	setKnownConfs();
