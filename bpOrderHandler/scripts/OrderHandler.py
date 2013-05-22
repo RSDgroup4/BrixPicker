@@ -24,7 +24,7 @@ state = system_state()
 next_state = system_state()
 loop_rate = 10
 bricks = []
-order1 = 0
+queueBricks = []
 currentOrders = [0, 0, 0]
 bricksRemaining = [0, 0, 0]
 offset_x = 0
@@ -75,10 +75,7 @@ def findOrder(blue, red, yellow):
                 order_ticket = takeOrder(tmpOrder)
                 if order_ticket != 0:
                     tmpOrder.order_ticket = order_ticket
-                    tmpOrder.order_tray = 1 #TODO fix!
                     tmpOrder.header.stamp = rospy.Time.now()
-                    #rospy.loginfo("ID: %d, ticket: %s, time: %s" % (order1.order_id, order1.order_ticket, order1.header.stamp))
-                    #rospy.loginfo("New order chosen with id: %d - blue: %d, red %d, yellow %d" % (order1.order_id, order1.blue_bricks, order1.red_bricks, order1.yellow_bricks))
                     return tmpOrder
         return 0
     except rospy.ServiceException, e:
@@ -128,6 +125,10 @@ def execute():
     global totalOrders
     global ordersDone
     global currentOrders
+    
+    while len(queueBricks) > 0:
+	bricks.append(queueBricks.pop())
+
     # Check if orders are done or too old
     for i in range(len(currentOrders)):
         # Check if order exists 
@@ -143,55 +144,57 @@ def execute():
                 totalOrders += 1
                 if finishOrder(currentOrders[i]):
                     ordersDone += 1
-                    logPublisher.publish("Order #%d done! in tray %d" % (order1.order_id, order1.order_tray))
-                    rospy.loginfo("Order #%d done! in tray %d" % (order1.order_id, order1.order_tray))
+                    logPublisher.publish("Order #%d done! in tray %d" % (currentOrders[i].order_id, currentOrders[i].order_tray))
+                    rospy.loginfo("Order #%d done! in tray %d" % (currentOrders[i].order_id, currentOrders[i].order_tray))
                 else:
-                    rospy.loginfo("Order #%d done, but failed to be confirmed by MessyServer! in tray %d" % (order1.order_id, order1.order_tray))
-                    logPublisher.publish("Order #%d done, but failed to be confirmed by MessyServer! in tray %d" % (order1.order_id, order1.order_tray))
+                    rospy.loginfo("Order #%d done, but failed to be confirmed by MessyServer! in tray %d" % (currentOrders[i].order_id, currentOrders[i].order_tray))
+                    logPublisher.publish("Order #%d done, but failed to be confirmed by MessyServer! in tray %d" % (currentOrders[i].order_id, currentOrders[i].order_tray))
                 currentOrders[i] = 0
           
     if len(bricks) > 0 and robot_queue < 2:
         best_y = -10
-        shortestTimeLeft = 1000
         order_to_get_brick = -1
+	bestBrick = -1
         for i in range(len(bricks)-1,-1,-1):
+		shortestTimeLeft = 1000
                 # check if brick is needed
                 current_y = bricks[i].y + belt_speed * (rospy.Time.now().to_sec() - bricks[i].header.stamp.to_sec())
                 # check if brick can be reached
                 if current_y < 0.1:
                     # check if brick is closer to being out of reach
                     for j in range(len(currentOrders)):
-                        if (currentOrders[i] != 0):
-                            if ((bricks[i].type == bricks[i].RED and currentOrders[i].red_bricks > 0) or (bricks[i].type == bricks[i].YELLOW and currentOrders[i].yellow_bricks > 0) or (bricks[i].type == bricks[i].BLUE and currentOrders[i].blue_bricks > 0)):
+                        if (currentOrders[j] != 0):
+                            if ((bricks[i].type == bricks[i].RED and currentOrders[j].red_bricks > 0) or (bricks[i].type == bricks[i].YELLOW and currentOrders[j].yellow_bricks > 0) or (bricks[i].type == bricks[i].BLUE and currentOrders[j].blue_bricks > 0)):
                                 if current_y >= best_y:
                                     # if so brick is best brick
                                     bestBrick = bricks[i]
                                     best_y = current_y
-                                    if currentOrders[i].header.stamp.to_sec() - rospy.Time.now().to_sec() < shortest_time_left:
-                                        order_to_get_brick = i
+                                    if currentOrders[j].header.stamp.to_sec() - rospy.Time.now().to_sec() < shortestTimeLeft:
+                                        order_to_get_brick = j
+					shortestTimeLeft = currentOrders[j].header.stamp.to_sec() - rospy.Time.now().to_sec()
                 else:
                     bricks.pop(i)
         # If brick is needed pick it..!
-        if order_to_get_brick != -1:
+        if order_to_get_brick != -1 and bestBrick != -1:
             brickToPick = robot_pick()
             brickToPick.order = currentOrders[order_to_get_brick].order_tray
             brickToPick.belt_speed = belt_speed
             brickToPick.x = bestBrick.x
             brickToPick.y = bestBrick.y + belt_speed * (rospy.Time.now().to_sec() - bestBrick.header.stamp.to_sec())
-            brickToPick.angle = 0 #bestBrick.angle
+            brickToPick.angle = bestBrick.angle
             brickToPick.id = bestBrick.id
             brickToPick.header.stamp = rospy.Time.now()
             brickToPick.type = bestBrick.type
             robot_publisher.publish(brickToPick)
             robot_queue += 1
-            rospy.loginfo("X: %f, Y: %f, Type: %d Robot queue: %d" % (brickToPick.x, brickToPick.y, brickToPick.type, robot_queue))
-            bricks.remove(bestBrick)
             if brickToPick.type == brickToPick.RED:
                 currentOrders[order_to_get_brick].red_bricks -= 1
             elif brickToPick.type == brickToPick.YELLOW:
                 currentOrders[order_to_get_brick].yellow_bricks -= 1
             elif brickToPick.type == brickToPick.BLUE:
                 currentOrders[order_to_get_brick].blue_bricks -= 1
+            rospy.loginfo("Pick! Type: %d, OrderTray: %d, OrderNr: %d, ID: %d, R: %d, B: %d, Y: %d" % (brickToPick.type, currentOrders[order_to_get_brick].order_tray, order_to_get_brick, currentOrders[order_to_get_brick].order_id, currentOrders[order_to_get_brick].red_bricks, currentOrders[order_to_get_brick].blue_bricks, currentOrders[order_to_get_brick].yellow_bricks))
+	    bricks.remove(bestBrick)
         # No orders need any of the bricks in the system - start new order..!
         else:
             # Start new order
@@ -201,28 +204,27 @@ def execute():
                     currentOrders[i].order_tray = i+1
                     if currentOrders[i] != 0:
                         bricksRemaining[i] = currentOrders[i].red_bricks + currentOrders[i].yellow_bricks + currentOrders[i].blue_bricks
-                        logPublisher.publish("Order #%d started in tray %d - ticket: \"%s\" at time: %s" % (order1.order_id, order1.order_tray, order1.order_ticket, order1.header.stamp))
+                        logPublisher.publish("Order #%d started in tray %d - ticket: \"%s\" at time: %s" % (currentOrders[i].order_id, currentOrders[i].order_tray, currentOrders[i].order_ticket, currentOrders[i].header.stamp))
                     break
                 else:
                     rospy.loginfo("Error picking order")
-
-    rospy.loginfo("Remaining: blue: %d, yellow: %d, red: %d - BricksInSys: %d - PicksRemain: %d, totalOrders: %d, ordersDone: %d" % (order1.blue_bricks, order1.yellow_bricks, order1.red_bricks, len(bricks), bricksRemaining, totalOrders, ordersDone))
         
             
 def robotCallback(msg):
     global robot_queue
+    global currentOrders
     robot_queue -= 1
     if (msg.succes):
         global bricksRemaining
         bricksRemaining[msg.order-1] -= 1
     else:
         if msg.type == msg.RED:
-            currentOrder[msg.order-1].red_bricks += 1
+            currentOrders[msg.order-1].red_bricks += 1
         elif msg.type == msg.YELLOW:
-            currentOrder[msg.order-1].yellow_bricks += 1
+            currentOrders[msg.order-1].yellow_bricks += 1
         elif msg.type == msg.BLUE:
-            currentOrder[msg.order-1].blue_bricks += 1  
-    rospy.loginfo("Brick picked, succes: %d, BricksRemaining: %d" % (msg.succes, bricksRemaining))
+            currentOrders[msg.order-1].blue_bricks += 1  
+    rospy.loginfo("Brick picked, succes: %d, BrickType: %d, Remaining in order %d: %d" % (msg.succes, msg.type, msg.order-1, bricksRemaining[msg.order-1]))
     
             
 
@@ -232,16 +234,10 @@ def changeStateCallback(msg):
     next_state.state = msg.state
     
 def brickCallback(msg):
-    rospy.loginfo("Brick recieved")
-    global bricks
-    brickAlreadyExists = False
-    for i in range(len(bricks)):
-        if msg.id == bricks[i].id:
-            brickAlreadyExists = True
-    if not brickAlreadyExists:
-        msg.x += offset_x
-        msg.y -= offset_y
-        bricks.append(msg)
+    global queueBricks
+    msg.x += offset_x
+    msg.y -= offset_y
+    queueBricks.append(msg)
 
 def orderHandler():
     rospy.init_node('OrderHandler')
@@ -345,16 +341,27 @@ def orderHandler():
             #System state
             systemStatePublisher.publish(state)
 	    #Order data
-	    if order1 != 0:
-	    	tmpOrder = order()
-            tmpOrder.red_bricks = order1.red_bricks
-            tmpOrder.yellow_bricks = order1.yellow_bricks
-            tmpOrder.blue_bricks = order1.blue_bricks
-            tmpOrder.order_id = order1.order_id
-            tmpOrder.order_tray = order1.order_tray
-            tmpOrder.header.stamp = order1.header.stamp
-            tmpOrder.time = str(int(180 - (rospy.Time.now().to_sec() - order1.header.stamp.to_sec())))
-            orderDataPublisher.publish(tmpOrder)
+	    for i in range(len(currentOrders)):
+	    	if currentOrders[i] != 0:
+		    tmpOrder = order()
+		    tmpOrder.red_bricks = currentOrders[i].red_bricks
+		    tmpOrder.yellow_bricks = currentOrders[i].yellow_bricks
+		    tmpOrder.blue_bricks = currentOrders[i].blue_bricks
+		    tmpOrder.order_id = currentOrders[i].order_id
+		    tmpOrder.order_tray = currentOrders[i].order_tray
+		    tmpOrder.header.stamp = currentOrders[i].header.stamp
+		    tmpOrder.time = str(int(180 - (rospy.Time.now().to_sec() - currentOrders[i].header.stamp.to_sec())))
+		    orderDataPublisher.publish(tmpOrder)
+		else:
+		    tmpOrder = order()
+		    tmpOrder.red_bricks = 0
+		    tmpOrder.yellow_bricks = 0
+		    tmpOrder.blue_bricks = 0
+		    tmpOrder.order_id = 0
+		    tmpOrder.order_tray = i+1
+		    tmpOrder.header.stamp = rospy.Time.now()
+		    tmpOrder.time = str(0)
+		    orderDataPublisher.publish(tmpOrder)		    
         
         rospy.sleep(1.0/loop_rate)
         

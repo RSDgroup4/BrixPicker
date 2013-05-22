@@ -35,7 +35,7 @@ double robot_center_x = 0.350;
 double robot_min_y = -0.400;
 double robot_max_y = 0.400;
 double belt_speed = 0;
-double time_to_pick = 3;
+double time_to_pick = 1.5;
 
 std::vector<bpMsgs::robot_pick> pending_bricks;
 
@@ -151,9 +151,6 @@ void setKnownConfs(void)
 
 void brickHandler(bpMsgs::robot_pick msg)
 {
-	//msg.header.stamp = ros::Time::now();
-	//msg.header.stamp -= ros::Duration(5);
-
 	pending_bricks.push_back(msg);
 	belt_speed = msg.belt_speed;
 	ROS_INFO("Brick received. Bricks pending: %d", pending_bricks.size());
@@ -199,7 +196,7 @@ bool calcPositions(bpMsgs::robot_pick& brick)
 	cmdWaitPosition.command_number = bpDrivers::commandRequest::SET_TOOL_FLANGE_CARTESIAN_POSITION;
 	cmdWaitPosition.x = x*M2MM;
 	cmdWaitPosition.y = y*M2MM;
-	cmdWaitPosition.z = (z_pickup + 0.03)*M2MM;
+	cmdWaitPosition.z = (z_pickup + 0.0175)*M2MM;
 	cmdWaitPosition.theta_x = 0;
 	cmdWaitPosition.theta_y = theta_y_offset;
 	cmdWaitPosition.theta_z = brick.angle;
@@ -243,7 +240,7 @@ int main(int argc, char **argv)
 	n.param<int> ("loop_rate", loop_rate_param, 1);
 
 
-	brick_publisher = nh.advertise<bpMsgs::robot_pick> (brick_publisher_topic.c_str(), 1);
+	brick_publisher = nh.advertise<bpMsgs::robot_pick> (brick_publisher_topic.c_str(), 10);
 	brick_subscriber = nh.subscribe<bpMsgs::robot_pick> (brick_subscriber_topic.c_str(), 20, brickHandler);
 
 	setKnownConfs();
@@ -303,16 +300,16 @@ int main(int argc, char **argv)
 
 			case go_down_to_pick_brick:
 				ROS_INFO("go_down_to_pick_brick");
-				if (brickToPick.header.stamp.toSec() < (ros::Time::now().toSec() + 1.5) )
+				if (brickToPick.header.stamp.toSec() < (ros::Time::now().toSec()) )
 				{
 					ROS_INFO("Go down to brick: to late");
 					robot_state = failed;
 				}
-				else if ( (ros::Time::now().toSec() - brickToPick.header.stamp.toSec()) > -2.0)
+				else if ( (ros::Time::now().toSec() - brickToPick.header.stamp.toSec()) > -0.15)
 				{
 					robot_client.call(cmdGripPosition,cmdRes);
-					robot_state = wait_for_grip_position;
-					ros::Duration(0.1).sleep();
+					robot_state = wait_for_brick;//wait_for_grip_position;
+					ros::Duration(0.05).sleep();
 				}
 				break;
 
@@ -328,7 +325,7 @@ int main(int argc, char **argv)
 
 			case wait_for_brick:
 				ROS_INFO("wait_for_brick");
-				if (brickToPick.header.stamp.toSec() < (ros::Time::now().toSec() - 0.25) )
+				if (brickToPick.header.stamp.toSec() < (ros::Time::now().toSec() - 0.0) )
 				{
 					robot_client.call(cmdCloseGripper,cmdRes);
 					ros::Duration(0.2).sleep();
@@ -338,9 +335,9 @@ int main(int argc, char **argv)
 
 			case go_to_delivery_position:
 				ROS_INFO("go_to_delivery_position");
+				robot_client.call(cmdWaitPosition,cmdRes);				
 				robot_client.call(cmdOrder[brickToPick.order-1],cmdRes);
 				robot_client.call(cmdOrderDropoff[brickToPick.order-1],cmdRes);
-				//robot_state = wait_for_delivery_position;
 				robot_state = wait_for_delivery_position;
 				ros::Duration(0.1).sleep();
 				break;
