@@ -9,50 +9,60 @@
 
 #include "PLCController.h"
 
+#define RECIEVE_DATA 128
+#define SAFETY_MODE 1
+#define GRIPPER_SENSOR 2
+#define BELT 4
+
 using namespace std;
 
 PLCController::PLCController()
 {
+	  isBeltOn = false;
+	  isGripperSensorActive = false;
+	  isSafetyHigh = false;
+	  setBelt = false;
+	  setSafety = false;
 }
 
 bool PLCController::commandServiceHandler(	bpPLCController::command::Request  &req,
          	 	 	 	 	 	 	 	 	bpPLCController::command::Response &res)
 {
-	bpMsgs::serial msg;
 	switch (req.command_number) {
-			case bpPLCController::command::Request::SET_BELT_SPEED:
-				ROS_INFO("PLC service: Setting beltspeed to: %f", req.value);
-				break;
-			case bpPLCController::command::Request::GET_BELT_SPEED:
-				ROS_INFO("PLC service: Get belt speed");
-				break;
+
 			case bpPLCController::command::Request::START_BELT:
 				ROS_INFO("PLC service: Start belt");
-				msg.data = "BELT_START";
-				plc_serial_publisher.publish(msg);
+				setBelt = true;
+				res.result = true;
 				break;
 			case bpPLCController::command::Request::STOP_BELT:
 				ROS_INFO("PLC service: Stop belt");
-				msg.data = "BELT_STOP";
-				plc_serial_publisher.publish(msg);
+				setBelt = false;
+				res.result = true;
 				break;
 			case bpPLCController::command::Request::TOGGLE_EMERGENCY_STOP:
 				ROS_INFO("PLC service: Toggle emergency stop");
+				setSafety = true;
+				res.result = true;
 				break;
-			case bpPLCController::command::Request::SET_BELT_DIRECTION:
-				ROS_INFO("PLC service: Set belt direction");
-				if (req.value == 1)
-					msg.data = "BELT_FORWARD";
-				else if (req.value == -1)
-					msg.data = "BELT_REVERSE";
-				else
-					break;
-				plc_serial_publisher.publish(msg);
+			case bpPLCController::command::Request::RELEASE_EMERGENCY_STOP:
+				ROS_INFO("PLC service: Toggle emergency stop");
+				setSafety = false;
+				res.result = true;
 				break;
 			case bpPLCController::command::Request::GET_EMERGENCY_STOP_STATUS:
 				ROS_INFO("PLC service: Get emergency stop status");
+				res.result = isSafetyHigh;
+				res.value = isSafetyHigh;
 				break;
-
+			case bpPLCController::command::Request::GET_GRIPPER_SENSOR_STATUS:
+				res.result = isGripperSensorActive;
+				res.value = isGripperSensorActive;
+				break;
+			case bpPLCController::command::Request::GET_BELT_STATUS:
+				res.result = isBeltOn;
+				res.value = isBeltOn;
+				break;
 			default:
 				ROS_ERROR("PLCController service called with unknown command number");
 				break;
@@ -60,9 +70,36 @@ bool PLCController::commandServiceHandler(	bpPLCController::command::Request  &r
 	return true;
 }
 
-void PLCController::recieveSerialDataHandler(const bpMsgs::serial::ConstPtr& msg)
+void PLCController::recieveSerialDataHandler(const std_msgs::ByteMultiArrayConstPtr& msg)
 {
-	ROS_INFO("PLCcontroller received a message from the PLC saying: %s", msg->data.c_str());
+	ROS_INFO("BELT: %d, Gripper: %d, SAFETY: %d", msg->data[0] & BELT, msg->data[0] & GRIPPER_SENSOR, msg->data[0] & SAFETY_MODE);
+	if (msg->data[0] & BELT)
+		isBeltOn = true;
+	else
+		isBeltOn = false;
+	if (msg->data[0] & GRIPPER_SENSOR)
+		isGripperSensorActive = true;
+	else
+		isGripperSensorActive = false;
+	if (msg->data[0] & SAFETY_MODE)
+		isSafetyHigh = true;
+	else
+		isSafetyHigh = false;
+
+}
+
+void PLCController::mainLoop(int loopRate)
+{
+	ros::Rate loop_rate(loopRate);
+	while (ros::ok())
+	{
+		ros::spinOnce();
+		std_msgs::ByteMultiArray tx_msg;
+		char tx_byte = RECIEVE_DATA + setBelt*BELT + setSafety*SAFETY_MODE;
+		tx_msg.data.push_back(tx_byte);
+		plc_serial_publisher.publish(tx_msg);
+		loop_rate.sleep();
+	}
 }
 
 PLCController::~PLCController()

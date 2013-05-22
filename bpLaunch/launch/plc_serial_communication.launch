@@ -1,11 +1,12 @@
 <launch>
 <group ns="/bpDrivers">
-	<node pkg="bpDrivers" type="serial_string" name="plc_serial_driver" respawn="true">
-        	<param name="publisher_topic" value="/bpDrivers/plc_serial_rx" />	 
-        	<param name="subscriber_topic" value="/bpDrivers/plc_serial_tx" />
+	<node pkg="bpDrivers" type="serial_binary" name="plc_serial_driver" respawn="true">
+        	<param name="rx" value="/bpDrivers/plc_serial_rx" />	 
+        	<param name="tx" value="/bpDrivers/plc_serial_tx" />
 		<param name="device" value="/dev/ttyUSB0" />	
-		<param name="baudrate" value="115200" />		
-		<param name="termination_character" value="13" />
+		<param name="baud_rate" value="19200" />		
+		<param name="rx_timeout" value="100" />
+		<param name="rx_max_chars" value="1" />
 	</node>
 	</group>
 </launch>
