@@ -14,7 +14,7 @@
 #include <string>
 
 #include "ros/ros.h"
-#include "bpMsgs/serial.h"
+#include "std_msgs/ByteMultiArray.h"
 #include "bpPLCController/command.h"
 
 class PLCController
@@ -22,9 +22,11 @@ class PLCController
 private:
 
   /* private variables */
-
-  bpMsgs::serial serial_rx_msg;
-
+  bool isBeltOn;
+  bool isGripperSensorActive;
+  bool isSafetyHigh;
+  bool setBelt;
+  bool setSafety;
   /* private methods */
 
 public:
@@ -39,7 +41,9 @@ public:
   bool commandServiceHandler(bpPLCController::command::Request  &req,
            bpPLCController::command::Response &res);
 
-  void recieveSerialDataHandler(const bpMsgs::serial::ConstPtr& msg);
+  void recieveSerialDataHandler(const std_msgs::ByteMultiArrayConstPtr& msg);
+
+  void mainLoop(int loopRate);
 
   virtual ~PLCController();
 
