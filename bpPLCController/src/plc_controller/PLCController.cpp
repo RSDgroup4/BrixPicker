@@ -25,41 +25,41 @@ PLCController::PLCController()
 	  setSafety = false;
 }
 
-bool PLCController::commandServiceHandler(	bpPLCController::command::Request  &req,
-         	 	 	 	 	 	 	 	 	bpPLCController::command::Response &res)
+bool PLCController::commandServiceHandler(	bpPLCController::plc_command::Request  &req,
+         	 	 	 	 	 	 	 	 	bpPLCController::plc_command::Response &res)
 {
 	switch (req.command_number) {
 
-			case bpPLCController::command::Request::START_BELT:
+			case bpPLCController::plc_command::Request::START_BELT:
 				ROS_INFO("PLC service: Start belt");
 				setBelt = true;
 				res.result = true;
 				break;
-			case bpPLCController::command::Request::STOP_BELT:
+			case bpPLCController::plc_command::Request::STOP_BELT:
 				ROS_INFO("PLC service: Stop belt");
 				setBelt = false;
 				res.result = true;
 				break;
-			case bpPLCController::command::Request::TOGGLE_EMERGENCY_STOP:
+			case bpPLCController::plc_command::Request::TOGGLE_EMERGENCY_STOP:
 				ROS_INFO("PLC service: Toggle emergency stop");
 				setSafety = true;
 				res.result = true;
 				break;
-			case bpPLCController::command::Request::RELEASE_EMERGENCY_STOP:
+			case bpPLCController::plc_command::Request::RELEASE_EMERGENCY_STOP:
 				ROS_INFO("PLC service: Toggle emergency stop");
 				setSafety = false;
 				res.result = true;
 				break;
-			case bpPLCController::command::Request::GET_EMERGENCY_STOP_STATUS:
+			case bpPLCController::plc_command::Request::GET_EMERGENCY_STOP_STATUS:
 				ROS_INFO("PLC service: Get emergency stop status");
 				res.result = isSafetyHigh;
 				res.value = isSafetyHigh;
 				break;
-			case bpPLCController::command::Request::GET_GRIPPER_SENSOR_STATUS:
+			case bpPLCController::plc_command::Request::GET_GRIPPER_SENSOR_STATUS:
 				res.result = isGripperSensorActive;
 				res.value = isGripperSensorActive;
 				break;
-			case bpPLCController::command::Request::GET_BELT_STATUS:
+			case bpPLCController::plc_command::Request::GET_BELT_STATUS:
 				res.result = isBeltOn;
 				res.value = isBeltOn;
 				break;
@@ -82,9 +82,23 @@ void PLCController::recieveSerialDataHandler(const std_msgs::ByteMultiArrayConst
 	else
 		isGripperSensorActive = false;
 	if (msg->data[0] & SAFETY_MODE)
-		isSafetyHigh = true;
+	{
+		if (isSafetyHigh == false)
+		{
+			isSafetyHigh = true;
+			emergency_stop_msg.data = true;
+			emergency_stop_publisher.publish(emergency_stop_msg);
+		}
+	}
 	else
-		isSafetyHigh = false;
+	{
+		if (isSafetyHigh == true)
+		{
+			isSafetyHigh = false;
+			emergency_stop_msg.data = false;
+			emergency_stop_publisher.publish(emergency_stop_msg);
+		}
+	}
 
 }
 

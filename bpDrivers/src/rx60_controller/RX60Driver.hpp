@@ -67,6 +67,9 @@ public:
 		eMP_LEAVE = 128
 	};
 
+	  std::string rx60_controller_ip;
+	  std::string rx60_controller_port;
+
 protected:
 
 private:

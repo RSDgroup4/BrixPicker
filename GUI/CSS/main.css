@@ -1,0 +1,14 @@
+table, th, td
+{
+	border: 1px solid black;
+    width: 1024px;
+    text-align: center;
+    max-height: 800px;
+}
+div
+{
+	max-width:1024px;
+	max-height:800px;
+	margin-left:auto;
+	margin-right:auto;
+}

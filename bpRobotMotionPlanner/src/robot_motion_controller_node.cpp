@@ -12,6 +12,8 @@
 #include "bpDrivers/command.h"
 #include <math.h>
 #include "bpMsgs/robot_pick.h"
+#include "bpPLCController/plc_command.h"
+#include "std_msgs/Bool.h"
 
 #define M2MM 1000.0
 
@@ -26,7 +28,8 @@ enum state {
 	go_to_safe_position,
 	wait_for_safe_position,
 	failed,
-	succeded
+	succeded,
+	emergency_stop
 };
 
 double robot_min_x = 0.260;
@@ -37,22 +40,22 @@ double robot_max_y = 0.400;
 double belt_speed = 0;
 double time_to_pick = 1.5;
 
+state robot_state;
+ros::ServiceClient robot_client;
+bpDrivers::commandRequest cmdReq;
+bpDrivers::commandResponse cmdRes;
+
 std::vector<bpMsgs::robot_pick> pending_bricks;
 
 std::vector<bpDrivers::commandRequest> cmdOrder;
 std::vector<bpDrivers::commandRequest> cmdOrderDropoff;
-bpDrivers::commandRequest cmdOrder1;
-bpDrivers::commandRequest cmdOrder2;
-bpDrivers::commandRequest cmdOrder3;
-bpDrivers::commandRequest cmdOrder1dropoff;
-bpDrivers::commandRequest cmdOrder2dropoff;
-bpDrivers::commandRequest cmdOrder3dropoff;
 bpDrivers::commandRequest cmdIdle;
 bpDrivers::commandRequest cmdShutdown;
 bpDrivers::commandRequest cmdWaitPosition;
 bpDrivers::commandRequest cmdGripPosition;
 bpDrivers::commandRequest cmdCloseGripper;
 bpDrivers::commandRequest cmdOpenGripper;
+bpDrivers::commandRequest cmdResetMotion;
 
 
 
@@ -71,6 +74,8 @@ void setKnownConfs(void)
 //	cmdIdle.joint4 = 0;
 //	cmdIdle.joint5 = 59.84;
 //	cmdIdle.joint6 = -7.67;
+
+	cmdResetMotion.command_number = bpDrivers::commandRequest::RESET_MOTION;
 
 	cmdShutdown.command_number = bpDrivers::commandRequest::SET_JOINT_CONFIGURATION;
 	cmdShutdown.joint1 = 0;
@@ -156,6 +161,21 @@ void brickHandler(bpMsgs::robot_pick msg)
 	ROS_INFO("Brick received. Bricks pending: %d", pending_bricks.size());
 }
 
+void emergencyStopHandler(std_msgs::Bool msg)
+{
+	if (msg.data)
+	{
+		pending_bricks.clear();
+		robot_client.call(cmdResetMotion,cmdRes);
+		robot_state = emergency_stop;
+	}
+	else
+	{
+		robot_client.call(cmdOpenGripper,cmdRes);
+		robot_state = idle;
+	}
+}
+
 bool calcPositions(bpMsgs::robot_pick& brick)
 {
 	double x = brick.x;
@@ -188,15 +208,16 @@ bool calcPositions(bpMsgs::robot_pick& brick)
 
 	// Calculate Z
 	double z_pickup = (1.2963*pow(x,2.0) - 0.8685*x - 0.0738);
-	if (y < 0)
-	   z_pickup += 0.003;
+	if (y > 0.1)
+		z_pickup += y * 0.015;
+	
 
-	ROS_INFO("Theta: %f, Z: %f", theta_y_offset, z_pickup);
+	ROS_INFO("Theta: %f, X: %f, Y: %f, Z: %f", theta_y_offset, x, y, z_pickup);
 
 	cmdWaitPosition.command_number = bpDrivers::commandRequest::SET_TOOL_FLANGE_CARTESIAN_POSITION;
 	cmdWaitPosition.x = x*M2MM;
 	cmdWaitPosition.y = y*M2MM;
-	cmdWaitPosition.z = (z_pickup + 0.0175)*M2MM;
+	cmdWaitPosition.z = (z_pickup + 0.015)*M2MM;
 	cmdWaitPosition.theta_x = 0;
 	cmdWaitPosition.theta_y = theta_y_offset;
 	cmdWaitPosition.theta_z = brick.angle;
@@ -204,7 +225,7 @@ bool calcPositions(bpMsgs::robot_pick& brick)
 	cmdGripPosition.command_number = bpDrivers::commandRequest::SET_TOOL_FLANGE_CARTESIAN_POSITION;
 	cmdGripPosition.x = x*M2MM;
 	cmdGripPosition.y = y*M2MM;
-	cmdGripPosition.z = (z_pickup - 0.003)*M2MM;
+	cmdGripPosition.z = (z_pickup - 0.006)*M2MM;
 	cmdGripPosition.theta_x = 0;
 	cmdGripPosition.theta_y = theta_y_offset;
 	cmdGripPosition.theta_z = brick.angle;
@@ -217,18 +238,20 @@ int main(int argc, char **argv)
 	pending_bricks = std::vector<bpMsgs::robot_pick>();
 
 	/* ros messages */
-	bpDrivers::commandRequest cmdReq;
-	bpDrivers::commandResponse cmdRes;
 
 	/* parameters */
 	std::string brick_subscriber_topic;
 	std::string brick_publisher_topic;
+	std::string emergency_stop_subscriber_topic;
 	int loop_rate_param;
 
 	/* initialize ros usage */
 	ros::init(argc, argv, "robot_motion_controller");
 	ros::Publisher brick_publisher;
 	ros::Subscriber brick_subscriber;
+	ros::Subscriber emergency_stop_subscriber;
+	bpPLCController::plc_command plcCommand;
+	plcCommand.request.command_number = bpPLCController::plc_command::Request::GET_GRIPPER_SENSOR_STATUS;
 
 	/* private nodehandlers */
 	ros::NodeHandle nh;
@@ -237,20 +260,24 @@ int main(int argc, char **argv)
 	/* read parameters from ros parameter server if available otherwise use default values */
 	n.param<std::string> ("brick_subscriber_topic", brick_subscriber_topic, "/bpRobotMotionController/brick_command_topic");
 	n.param<std::string> ("brick_publisher_topic", brick_publisher_topic, "/bpRobotMotionController/brick_response_topic");
+	n.param<std::string> ("emergency_stop_subscriber_topic", emergency_stop_subscriber_topic, "/emergency_stop");
 	n.param<int> ("loop_rate", loop_rate_param, 1);
 
 
 	brick_publisher = nh.advertise<bpMsgs::robot_pick> (brick_publisher_topic.c_str(), 10);
 	brick_subscriber = nh.subscribe<bpMsgs::robot_pick> (brick_subscriber_topic.c_str(), 20, brickHandler);
+	emergency_stop_subscriber = nh.subscribe<std_msgs::Bool> (emergency_stop_subscriber_topic.c_str(),20,emergencyStopHandler);
 
 	setKnownConfs();
 
-	ros::ServiceClient robot_client = n.serviceClient<bpDrivers::command>("/bpDrivers/rx60_controller/rx60_command");
+	robot_client = n.serviceClient<bpDrivers::command>("/bpDrivers/rx60_controller/rx60_command");
+	ros::ServiceClient plc_client = n.serviceClient<bpPLCController::plc_command>("/plc_controller/plc_command");
+
 	std::cout << "RobotMotionPlanner node started! - waiting for RX60 controller service" << std::endl;
 	robot_client.waitForExistence();
 	std::cout << "RX60 controller service found! - Going to idle position" << std::endl;
 
-	state robot_state = idle;
+	robot_state = idle;
 
 	// Go to Idle position
 	robot_client.call(cmdIdle,cmdRes);
@@ -266,7 +293,6 @@ int main(int argc, char **argv)
 
 		switch (robot_state) {
 			case idle:
-				//ROS_INFO("IDLE");
 				if (pending_bricks.size() > 0)
 				{
 					brickToPick = pending_bricks[0];
@@ -279,8 +305,8 @@ int main(int argc, char **argv)
 					else
 					{
 						robot_client.call(cmdWaitPosition,cmdRes);
+						ros::Duration(0.05).sleep();
 						robot_state = wait_for_wait_position;
-						ros::Duration(0.1).sleep();
 					}
 				}
 				else
@@ -289,7 +315,6 @@ int main(int argc, char **argv)
 				}
 				break;
 			case wait_for_wait_position:
-				ROS_INFO("wait_for_wait_position");
 				cmdReq.command_number = bpDrivers::commandRequest::IS_SETTLED;
 				robot_client.call(cmdReq,cmdRes);
 				if (cmdRes.is_settled)
@@ -299,14 +324,13 @@ int main(int argc, char **argv)
 				break;
 
 			case go_down_to_pick_brick:
-				ROS_INFO("go_down_to_pick_brick");
 				if (brickToPick.header.stamp.toSec() < (ros::Time::now().toSec()) )
 				{
-					ROS_INFO("Go down to brick: to late");
 					robot_state = failed;
 				}
-				else if ( (ros::Time::now().toSec() - brickToPick.header.stamp.toSec()) > -0.15)
+				else
 				{
+					ros::Duration( (brickToPick.header.stamp.toSec() - ros::Time::now().toSec()) - 0.20).sleep();
 					robot_client.call(cmdGripPosition,cmdRes);
 					robot_state = wait_for_brick;//wait_for_grip_position;
 					ros::Duration(0.05).sleep();
@@ -314,7 +338,6 @@ int main(int argc, char **argv)
 				break;
 
 			case wait_for_grip_position:
-				ROS_INFO("wait_for_grip_position");
 				cmdReq.command_number = bpDrivers::commandRequest::IS_SETTLED;
 				robot_client.call(cmdReq,cmdRes);
 				if (cmdRes.is_settled)
@@ -324,17 +347,26 @@ int main(int argc, char **argv)
 				break;
 
 			case wait_for_brick:
-				ROS_INFO("wait_for_brick");
 				if (brickToPick.header.stamp.toSec() < (ros::Time::now().toSec() - 0.0) )
 				{
 					robot_client.call(cmdCloseGripper,cmdRes);
-					ros::Duration(0.2).sleep();
-					robot_state = go_to_delivery_position;
+					ros::Duration(0.3).sleep();
+					plc_client.call(plcCommand);
+					ROS_INFO("Gripper1: %d", plcCommand.response.result);
+					if (!plcCommand.response.result)
+					{
+						robot_state = go_to_delivery_position;
+					}
+					else
+					{
+						robot_state = failed;
+						robot_client.call(cmdWaitPosition,cmdRes);
+						robot_client.call(cmdOpenGripper,cmdRes);
+					}
 				}
 				break;
 
 			case go_to_delivery_position:
-				ROS_INFO("go_to_delivery_position");
 				robot_client.call(cmdWaitPosition,cmdRes);				
 				robot_client.call(cmdOrder[brickToPick.order-1],cmdRes);
 				robot_client.call(cmdOrderDropoff[brickToPick.order-1],cmdRes);
@@ -343,26 +375,35 @@ int main(int argc, char **argv)
 				break;
 
 			case wait_for_delivery_position:
-				ROS_INFO("wait_for_dropoff_position");
 				cmdReq.command_number = bpDrivers::commandRequest::IS_SETTLED;
 				robot_client.call(cmdReq,cmdRes);
 				if (cmdRes.is_settled)
 				{
-					robot_client.call(cmdOpenGripper,cmdRes);
-					ros::Duration(0.3).sleep();
-					robot_state = go_to_safe_position;
+					plc_client.call(plcCommand);
+					ROS_INFO("Gripper2: %d", plcCommand.response.result);
+					if (!plcCommand.response.result)
+					{
+						robot_client.call(cmdOpenGripper,cmdRes);
+						ros::Duration(0.15).sleep();
+						robot_state = go_to_safe_position;
+					}
+					else
+					{
+						robot_client.call(cmdOpenGripper,cmdRes);
+						robot_client.call(cmdOrder[brickToPick.order-1],cmdRes);
+						ros::Duration(0.1).sleep();
+						robot_state = failed;
+					}
 				}
 				break;
 
 			case go_to_safe_position:
-				ROS_INFO("go_to_safe_position");
 				robot_client.call(cmdOrder[brickToPick.order-1],cmdRes);
 				ros::Duration(0.1).sleep();
 				robot_state = wait_for_safe_position;
 				break;
 
 			case wait_for_safe_position:
-				ROS_INFO("wait_for_safe_position");
 				cmdReq.command_number = bpDrivers::commandRequest::IS_SETTLED;
 				robot_client.call(cmdReq,cmdRes);
 				if (cmdRes.is_settled)
@@ -372,7 +413,6 @@ int main(int argc, char **argv)
 				break;
 
 			case succeded:
-				ROS_INFO("Successfully delivered brick");
 				returnMessage = brickToPick;
 				returnMessage.succes = true;
 				brick_publisher.publish(returnMessage);
@@ -387,6 +427,8 @@ int main(int argc, char **argv)
 				robot_state = idle;
 				break;
 
+			case emergency_stop:
+				break;
 
 			default:
 				break;

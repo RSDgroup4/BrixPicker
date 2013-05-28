@@ -50,6 +50,8 @@ int main(int argc, char **argv)
   RX60Driver * robot;
   ROS_INFO("Connection to RX60B at ip: %s and port: %s", rx60_controller_ip.c_str(), rx60_controller_port.c_str());
   robot = new RX60Driver(rx60_controller_ip, rx60_controller_port);
+  robot->rx60_controller_ip = rx60_controller_ip;
+  robot->rx60_controller_port = rx60_controller_port;
 
   if (!robot->isConnected()) {
 	std::cout << "Could not connect to robot!" << std::endl;

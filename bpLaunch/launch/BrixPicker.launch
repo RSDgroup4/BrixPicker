@@ -1,5 +1,26 @@
 <launch>
   <include file="$(find bpLaunch)/launch/usb_cam.launch" />
-  <include file="$(find bpLaunch)/launch/plc_serial_communication.launch" />
-  <include file="$(find bpLaunch)/launch/image_view.launch" />
+  <include file="$(find bpLaunch)/launch/plc_controller.launch" />
+  <include file="$(find bpLaunch)/launch/rx60_controller.launch" />
+  <include file="$(find rosbridge_launch)/launch/simple.launch" />
+  <group ns="/bpRobotMotionController">  
+    <node name="robot_motion_controller" pkg="bpRobotMotionPlanner" type="robot_motion_controller" output="screen">
+       <param name="brick_subscriber_topic" value="/bpRobotMotionController/brick_command_topic" />
+       <param name="brick_publisher_topic" value="/bpRobotMotionController/brick_response_topic" />
+       <param name="loop_rate" value="100" />
+    </node>
+  </group>
+  <group ns="/bpMessy2Controller">
+    <node name="messy2controller" pkg="bpMessy2Controller" type="Messy2Controller.py" output="screen" />
+  </group>
+  <node name="brick_detector" pkg="bpBricksDetector" type="bricksDetector" >
+    <param name="show_images" value="false" />
+  </node>
+  <group ns="/bpOrderHandler">
+    <node name="order_handler" pkg="bpOrderHandler" type="OrderHandler.py" output="screen" />
+  </group>
+  <node name="Processed_image" pkg="image_view" type="image_view" >
+    <remap from="image" to="/camera/image_processed"/>
+    <param name="autosize" value="true" />
+  </node>
 </launch>

@@ -22,12 +22,12 @@ int max_thresh = 255;
 RNG rng(12345);
 // High threshold values
 int huered(255), 	saturationred(255), 	valuered(255);
-int hueyellow(66), 	saturationyellow(255), 	valueyellow(255);
+int hueyellow(48), 	saturationyellow(255), 	valueyellow(255);
 int hueblue(170), 	saturationblue(255), 	valueblue(106);
 // low threshold values
 int hueredL(0), 	saturationredL(124), 	valueredL(68);
-int hueyellowL(13), saturationyellowL(54), 	valueyellowL(147);
-int hueblueL(117),	saturationblueL(143),	valueblueL(45);
+int hueyellowL(18), saturationyellowL(68), 	valueyellowL(158);
+int hueblueL(71),	saturationblueL(90),	valueblueL(29);
 
 double pixel_m = 2596;
 
@@ -229,21 +229,32 @@ void imageCallback(const sensor_msgs::ImageConstPtr& original_image)
 				if (minRect[i].size.width > minRect[i].size.height)
 					tmpBrick.angle += 90.0;
 
-				if (area > 1100 && area < 1800) {
+				Scalar color;
+				if (area > 1100 && area < 1900) {
 				   tmpBrick.type = 2;
 				   if (tmpBrick.angle < -45)
 					   tmpBrick.angle += 90.0;
 				   else if (tmpBrick.angle > 45)
 					   tmpBrick.angle -= 90.0;
+				   color = Scalar( 255, 0, 0 );
 				}
-				else if (area > 2100 && area < 3000){
+				else if (area > 2500 && area < 3300){
 				   tmpBrick.type = 1;
+				   color = Scalar( 0, 0, 255 );
 				}
-				else if(area > 4000 && area < 6500){
+				else if(area > 4300 && area < 6500){
 				   tmpBrick.type = 3;
+				   color = Scalar( 0, 255, 255 );
 				}
 				else{
 				   tmpBrick.type = 0;
+				   color = Scalar( 255, 255, 255 );
+				}
+				drawCross(minRect[i].center,color, 5, cv_ptr->image);
+				Point2f rect_points[4];
+				minRect[i].points( rect_points );
+				for( int j = 0; j < 4; j++ ) {
+					line( cv_ptr->image, rect_points[j], rect_points[(j+1)%4], color, 3, 8 );
 				}
 
 
@@ -294,25 +305,6 @@ void imageCallback(const sensor_msgs::ImageConstPtr& original_image)
 		   }
 
 	  }
-	  if (imgshow) {
-		   Mat drawing = Mat::zeros( imgdest.size(), CV_8UC3 );
-		     for( int i = 0; i< contours.size(); i++ )
-		        {
-		          Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
-		          drawCross(minRect[i].center,Scalar(0,0,255), 5, drawing);
-		          Point2f rect_points[4];
-		          minRect[i].points( rect_points );
-		          for( int j = 0; j < 4; j++ ) {
-		                    line( drawing, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
-		          }
-
-		        }
-
-
-		     cv::imshow("image processed", cv_ptr->image);
-		     cv::imshow("contours", drawing);
-	}
-
 	cv::waitKey(3);
 	
 	//Convert the CvImage to a ROS image message and publish it on the "camera/image_processed" topic.
@@ -324,12 +316,13 @@ int main(int argc, char **argv)
 	ros::init(argc, argv, "image_processor");
 	
 	ros::NodeHandle nh;
+	ros::NodeHandle n("~");
+
+	n.param<bool>("show_images", imgshow, false);
 	//Create an ImageTransport instance, initializing it with our NodeHandle.
 	image_transport::ImageTransport it(nh);
 	brick_pub = nh.advertise<bpMsgs::brick>("/bpBrickDetector/bricks", 10);
 	if (imgshow) {
-	cv::namedWindow("image processed", CV_WINDOW_NORMAL);
-	cv::namedWindow("contours", CV_WINDOW_NORMAL);
 	cv::namedWindow("grey", CV_WINDOW_NORMAL);
 
 	cv::namedWindow("TreshHigh", CV_WINDOW_NORMAL);
@@ -356,7 +349,8 @@ int main(int argc, char **argv)
 	createTrackbar( "Blue Hue", "TreshLow", &hueblueL, max_thresh, callback );
 	createTrackbar( "Blue Saturation", "TreshLow", &saturationblueL, max_thresh, callback );
 	createTrackbar( "Blue Value", "TreshLow", &valueblueL, max_thresh, callback );
-	callback(0,0); }
+	callback(0,0);
+	}
 
 //  image_transport::Subscriber sub = it.subscribe("/usb_cam/image_raw", 1, imageCallback);
 	image_transport::Subscriber sub = it.subscribe("camera/usb_cam/image_raw", 1, imageCallback);
@@ -365,9 +359,7 @@ int main(int argc, char **argv)
 	ros::spin();
 
 	if (imgshow) {
-		cv::destroyWindow("image processed");
 		cv::destroyWindow("grey");
-		cv::destroyWindow("contours");
 		cv::destroyWindow("TreshLow");
 		cv::destroyWindow("TreshHigh");
 	}

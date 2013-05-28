@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta content="PackML"/>
+    <link rel="stylesheet" type="text/css" href="CSS/main.css">
+    <title>RSD - Group 4</title>
+    <script type='text/javascript' src='js/libs/eventemitter2.js'></script>
+    <script type='text/javascript' src='js/libs/ros.js'></script>
+    <script type='text/javascript'>//<![CDATA[
+    var ros;    
+    var rosLog = "";
+    window.onload=function(){
+        ros = new ROS('ws://localhost:9090');
+        test = new WebSocket("ws://localhost:9090");
+
+	var listenerOee = new ros.Topic({
+	name        :'/oee',
+	messageType :'bpMsgs/oee_data'
+	});
+
+	var listenerOrderData = new ros.Topic({
+	name        :'/bpOrderHandler/order_status',
+	messageType :'bpMsgs/order'
+	});
+	var listenerSystemState = new ros.Topic({
+	    name        :'/bpOrderHandler/system_state',
+	    messageType :'bpMsgs/system_state'
+	});
+
+	var listenerLog = new ros.Topic({
+	    name        :'/log',
+	    messageType :'std_msgs/String'
+	});
+
+	//Subscribe block.
+	listenerOee.subscribe(OeeCallback);
+	listenerOrderData.subscribe(OrderDataCallback);
+	listenerSystemState.subscribe(SystemStateCallback);
+	listenerLog.subscribe(LogCallback);
+    }
+
+    //Callback functions.
+    function OeeCallback(message){
+        document.getElementById("oee").innerHTML = message.oee.toFixed(2);
+        document.getElementById("avail").innerHTML = message.availability.toFixed(2);
+        document.getElementById("perform").innerHTML = message.performance.toFixed(2);
+        document.getElementById("quality").innerHTML = message.quality.toFixed(2);
+    }
+
+    function OrderDataCallback(message){
+
+        switch (message.order_tray)
+        {
+            case 1:
+                document.getElementById("orderB1").innerHTML =
+                        "Yellow: " + message.yellow_bricks + "<br/>"
+                        + "Red: " + message.red_bricks + "<br/>"
+                        + "Blue: " + message.blue_bricks + "<br/>";
+                document.getElementById("orderT1").innerHTML =
+                        message.time + "s";
+                document.getElementById("orderId1").innerHTML =
+                        message.order_id;
+                break
+            case 2:
+                document.getElementById("orderB2").innerHTML =
+                        "Yellow: " + message.yellow_bricks + "<br/>"
+                                + "Red: " + message.red_bricks + "<br/>"
+                                + "Blue: " + message.blue_bricks + "<br/>";
+                document.getElementById("orderT2").innerHTML =
+                        message.time + "s";
+                document.getElementById("orderId2").innerHTML =
+                        message.order_id;
+                break
+            case 3:
+                document.getElementById("orderB3").innerHTML =
+                        "Yellow: " + message.yellow_bricks + "<br/>"
+                                + "Red: " + message.red_bricks + "<br/>"
+                                + "Blue: " + message.blue_bricks + "<br/>";
+                document.getElementById("orderT3").innerHTML =
+                        message.time + "s";
+                document.getElementById("orderId3").innerHTML =
+                        message.order_id;
+                break
+        }
+    }
+
+    function SystemStateCallback(message){
+        //alert(message);
+        switch (message.state)
+        {
+            case 10:
+                document.getElementById("systemState").innerHTML = "Idle";
+                document.getElementById("systemState").style.backgroundColor="#66FFCC";
+                break
+            case 11:
+                document.getElementById("systemState").innerHTML = "Execute";
+                document.getElementById("systemState").style.backgroundColor="#00FF00";
+                break
+            case 12:
+                document.getElementById("systemState").innerHTML = "Complete";
+                document.getElementById("systemState").style.backgroundColor="#99FFCC";
+                break
+            case 13:
+                document.getElementById("systemState").innerHTML = "Held";
+                document.getElementById("systemState").style.backgroundColor="#CC6600";
+                break
+            case 14:
+                document.getElementById("systemState").innerHTML = "Suspended";
+                document.getElementById("systemState").style.backgroundColor="#CCFF33";
+                break
+            case 15:
+                document.getElementById("systemState").innerHTML = "Aborted";
+                document.getElementById("systemState").style.backgroundColor="#FF3366";
+                break
+            case 16:
+                document.getElementById("systemState").innerHTML = "Stopped";
+                document.getElementById("systemState").style.backgroundColor="#FF0000";
+                break
+        }
+
+    }
+
+    function LogCallback(message){
+        //alert(message);
+        rosLog = message.data + "<br/>"+ rosLog;
+        document.getElementById("log").innerHTML = rosLog;
+        //document.getElementById("log").innerHTML =   message.data + "<br/>"
+    }
+    function testCallback(message) {
+
+		alert(message.data);
+		var mycel = document.getElementById("orderB1");
+		var myceltext = mycel.childNodes.item(0);
+		mycel.removeChild(myceltext);
+		var newtxt = document.createTextNode(message.data);
+		mycel.appendChild(newtxt);
+    }
+
+    function PublishRosMessage(val){
+	var rosState = {"state":0,"log_message":"State_Changed_From_Gui"};
+	var rosMessage = new ros.Topic({
+		name :'/bpOrderHandler/change_state',
+		messageType: 'bpMsgs/system_state'
+	});
+        switch (val)
+        {
+            case 20:
+                rosState.state = 20;
+                break
+            case 21:
+                rosState.state = 21;
+                break
+            case 22:
+                rosState.state = 22;
+                break
+            case 23:
+                rosState.state = 23;
+                break
+            case 24:
+                rosState.state = 23;
+                break
+        }
+        var message = new ros.Message(
+                rosState
+        );
+        rosMessage.publish(message);
+    }
+
+    function setBgColorById(id) {
+        //Getting all the td.
+        var elements = document.body.getElementsByTagName('td');
+        //Resetting all the td´s background color.
+        document.getElementById("State1").style.backgroundColor="Yellow";
+        document.getElementById("State2").style.backgroundColor="#66FF33";
+        document.getElementById("State3").style.backgroundColor="#0099CC";
+        //The color choosen for the active state.
+        var sColor = "#FF00FF";
+        //Setting the states current
+        if (document.getElementById) {
+            if (elem=document.getElementById(id)) {
+                if (elem.style) {
+                    elem.style.backgroundColor=sColor;
+                    return 1;  // success
+                }
+            }
+        }
+        return 0;  // failure
+    }//]]>
+    </script>
+</head>
+<body>
+<div id="orderTable">
+    <table>
+        <tr>
+            <td></td>
+            <td>Order 1</td>
+            <td>Order 2</td>
+            <td>Order 3</td>
+            <td style="background-color: blue;"></td>
+            <td>OEE</td>
+            <td id="oee">oee</td>
+            <td style="background-color: blue;"></td>
+            <td>System state</td>
+        </tr>
+        <tr>
+            <td id="orderTime">Time</td>
+            <td id="orderT1">orderT1</td>
+            <td id="orderT2">orderT2</td>
+            <td id="orderT3">orderT3</td>
+            <td style="background-color: blue;"></td>
+            <td>Availability</td>
+            <td id="avail">avail</td>
+            <td style="background-color: blue;"></td>
+            <td rowspan="3" id="systemState">systemState</td>
+        </tr>
+        <tr>
+            <td id="orderBricks">Remaining Bricks</td>
+            <td id="orderB1">orderB1</td>
+            <td id="orderB2">orderB2</td>
+            <td id="orderB3">orderB3</td>
+            <td style="background-color: blue;"></td>
+            <td>Performance</td>
+            <td id="perform">perform</td>
+            <td style="background-color: blue;"></td>
+        </tr>
+        <tr>
+            <td id="orderId">Order ids</td>
+            <td id="orderId1">orderId1</td>
+            <td id="orderId2">orderId2</td>
+            <td id="orderId3">orderId3</td>
+            <td style="background-color: blue;"></td>
+            <td>Quality</td>
+            <td id="quality">quality</td>
+            <td style="background-color: blue;"></td>
+        </tr>
+        <tr>
+            <td>Log Window</td>
+            <td colspan="8"><div id="log" style="height:400px; overflow:auto; text-align: left;">Sample</div></td>
+        </tr>
+    </table>
+</div>
+<form>
+<div id="buttons">
+<input type="button"  id="Estop" onclick="return PublishRosMessage(20)" value="E-Stop" />
+<input type="button" id="Reset" onclick="return PublishRosMessage(21)" value="Reset"/>
+<input type="button" id="Start" onclick="return PublishRosMessage(22)" value="Start"/>
+<input type="button" id="Stop" onclick="return PublishRosMessage(23)" value="Stop"/>
+<input type="button" id="Hold" onclick="return PublishRosMessage(24)" value="Hold"/>
+</div>
+</form>
+<!--
+<div id="tableState">
+
+<table align="center" border="1" style="display: none;">
+<tr>
+    <td>
+        &nbsp;
+        <input id="Button1" type="button" value="ON" onclick="return Button1_onclick()" /><input
+            id="Button2" type="button" value="OFF" /></td>
+    <td>
+        &nbsp;
+    </td>
+    <td>
+        &nbsp;
+    </td>
+    <td>
+        &nbsp;
+    </td>
+    <td>
+        &nbsp;
+    </td>
+    <td>
+        &nbsp;
+    </td>
+    <td>
+        &nbsp;
+    </td>
+    <td >
+        &nbsp;
+    </td>
+    <td>
+        &nbsp;
+    </td>
+    <td >
+        &nbsp;
+    </td>
+</tr>
+<tr>
+    <td>
+        &nbsp;
+        <input id="Button3" type="button" value="E-STOP" /></td>
+    <td >
+        &nbsp; </td>
+    <td>
+        &nbsp;
+    </td>
+    <td style="background-color:#66FF33;">
+        &nbsp;
+        Un-Holding</td>
+    <td>
+        &nbsp;<img src="Images/ArrowL.png" /></td>
+    <td  style="background-color:Yellow;">
+        &nbsp;
+        Held</td>
+    <td>
+        <img src="Images/ArrowL.png" /></td>
+    <td style="background-color:#66FF33;">
+        &nbsp;
+        Holding</td>
+    <td>
+        &nbsp;
+    </td>
+    <td >
+        &nbsp;
+    </td>
+</tr>
+<tr>
+    <td>
+        &nbsp;
+        <input id="Button4" type="button" value="Reset" /></td>
+    <td >
+        &nbsp;
+    </td>
+    <td>
+        &nbsp;
+    </td>
+    <td>
+        &nbsp;</td>
+    <td>
+        &nbsp;
+        <img src="Images/ArrowRD.png" /></td>
+    <td>
+        &nbsp;</td>
+    <td>
+        &nbsp;
+        <img  src="Images/ArrowRU.png" /></td>
+    <td >
+        &nbsp;
+    </td>
+    <td>
+        &nbsp;
+    </td>
+    <td>
+        &nbsp;
+    </td>
+</tr>
+<tr>
+    <td>
+        &nbsp;
+        <input id="Button5" type="button" value="Start" /></td>
+    <td style="background-color:Yellow;" Id="State1">
+        &nbsp; Idle (State1)</td>
+    <td>
+        &nbsp;<img  src="Images/ArrowR.png" /></td>
+    <td style="background-color:#66FF33; "Id="State2">
+        &nbsp; Starting</td>
+    <td>
+        <img src="Images/ArrowR.png" /></td>
+    <td style="background-color:#0099CC;" Id="State3">
+        &nbsp;
+        Execute</td>
+    <td>
+        <img src="Images/ArrowR.png" />
+    </td>
+    <td  style="background-color:#66FF33;">
+        &nbsp;
+        Completing</td>
+    <td>
+        <img src="Images/ArrowR.png" /></td>
+    <td style="background-color:Yellow;">
+        &nbsp;Complete</td>
+</tr>
+<tr>
+    <td>
+        &nbsp;
+        <input id="Button6" type="button" value="Stop" /></td>
+    <td >
+        &nbsp;</td>
+    <td>
+    </td>
+    <td >
+        &nbsp;</td>
+    <td>
+        &nbsp;
+        <img
+                src="Images/ArrowRU.png"/></td>
+    <td>
+        &nbsp;
+    </td>
+    <td>
+        <img src="Images/ArrowRD.png" /></td>
+    <td >
+        &nbsp;
+    </td>
+    <td>
+        &nbsp;
+    </td>
+    <td>
+        &nbsp;
+        <img src="Images/Down.png" /></td>
+</tr>
+<tr>
+    <td>
+        &nbsp;
+        <input id="Button7" type="button" value="Hold" /></td>
+    <td style="background-color:#66FF33;">
+        &nbsp; Reseting</td>
+    <td>
+        <img src="Images/ArrowL.png" /></td>
+    <td style="background-color:#66FF33;">
+        &nbsp; Un-Suspending</td>
+    <td>
+        <img src="Images/ArrowL.png" />
+    </td>
+    <td style="background-color:#66FF33;">
+        Suspended</td>
+    <td>
+        <img src="Images/ArrowL.png" />
+    </td>
+    <td style="background-color:#66FF33;">
+        Suspending</td>
+    <td>
+        &nbsp;
+    </td>
+    <td >
+        &nbsp;
+        <img src="Images/Down.png" /></td>
+</tr>
+<tr>
+    <td>
+        &nbsp;
+        <input id="Button8" type="button" value="Clear" /></td>
+    <td>
+        &nbsp;
+        <img  src="Images/Up.png" /></td>
+    <td>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        <img  src="Images/Left.png" /></td>
+    <td >
+        &nbsp;&nbsp;
+        <img src="Images/Left.png" /></td>
+    <td>
+        &nbsp;<img src="Images/Left.png" /></td>
+    <td>
+        &nbsp;<img src="Images/Left.png" /></td>
+    <td>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        <img src="Images/Left.png" /></td>
+    <td >
+        &nbsp;&nbsp;&nbsp;
+        <img src="Images/Left.png" /></td>
+    <td>
+        &nbsp;&nbsp;&nbsp;
+        <img  src="Images/Left.png" /></td>
+    <td >
+        &nbsp;<img src="Images/Left.png" /></td>
+</tr>
+<tr>
+    <td>
+        &nbsp;
+        <input id="Button9" type="button" value="Some action" /></td>
+    <td  style="background-color:Yellow;">
+        &nbsp;
+        Stopped</td>
+    <td>
+        &nbsp;
+        <img  src="Images/ArrowL.png" /></td>
+    <td  style="background-color:#66FF33;">
+        &nbsp;
+        Stopping</td>
+    <td>
+        &nbsp;
+    </td>
+    <td style="background-color:#66FF33;">
+        &nbsp;
+        Clearing</td>
+    <td>
+        &nbsp;
+        <img  src="Images/ArrowL.png" /></td>
+    <td   style="background-color:Yellow;">
+        &nbsp;
+        Aborted</td>
+    <td>
+        &nbsp;
+        <img  src="Images/ArrowL.png" /></td>
+    <td style="background-color:#66FF33;" class="style8">
+        &nbsp;
+        Aborting</td>
+</tr>
+<tr>
+    <td>
+        &nbsp;
+        <input id="Button10" type="button" value="Some action" /></td>
+    <td >
+        &nbsp;
+        <img  src="Images/Up.png" /></td>
+    <td>
+        &nbsp;
+        <img  src="Images/Left.png" /></td>
+    <td >
+        &nbsp;
+        <img  src="Images/Left.png" /></td>
+    <td>
+        &nbsp;
+        <img  src="Images/Left.png" /></td>
+    <td>
+        &nbsp;
+        <img  src="Images/Down.png" /></td>
+    <td>
+        &nbsp;
+    </td>
+    <td >
+        &nbsp;
+    </td>
+    <td>
+        &nbsp;
+    </td>
+    <td >
+        &nbsp;
+    </td>
+</tr>
+</table>
+
+</div>
+<select onChange="setBgColorById(this.options[this.selectedIndex].value)">
+    <option value="state0">Choose a state</option>
+    <option value="State1">State1</option>
+    <option value="State2">State2</option>
+    <option value="State3">State3</option>
+</select>  -->
+</body>
+</html>

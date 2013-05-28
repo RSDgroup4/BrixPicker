@@ -6,11 +6,12 @@ from bzrlib.switch import switch
 from rospy.timer import sleep
 from rospy.timer import Timer
 from std_msgs.msg import String
+from std_msgs.msg import Bool
 from bpMsgs.msg import brick
 from bpMsgs.msg import system_state
 from bpMsgs.msg import robot_pick
 from bpMsgs.msg import oee_data
-from bpMessy2Controller.srv import *
+from bpPLCController.srv import *
 from dynamic_reconfigure.server import Server
 from bpOrderHandler.cfg import offset_paramsConfig
 import rospy
@@ -22,6 +23,7 @@ import genpy
 #Global variables
 state = system_state()
 next_state = system_state()
+last_state = system_state()
 loop_rate = 10
 bricks = []
 queueBricks = []
@@ -34,6 +36,7 @@ take_order = False
 robot_publisher = 0
 logPublisher = 0
 orderDataPublisher = 0
+emergencyStopStatus = False
 
 take_all_bricks = False
 robot_queue = 0;
@@ -117,7 +120,7 @@ def finishOrder(order):
         print "Service call failed: %s"%e
         return False
 
-def execute():
+def execute(stopping):
     global bricks
     global bricksRemaining
     global robot_queue
@@ -154,7 +157,7 @@ def execute():
     if len(bricks) > 0 and robot_queue < 2:
         best_y = -10
         order_to_get_brick = -1
-	bestBrick = -1
+        bestBrick = -1
         for i in range(len(bricks)-1,-1,-1):
 		shortestTimeLeft = 1000
                 # check if brick is needed
@@ -187,27 +190,38 @@ def execute():
             brickToPick.type = bestBrick.type
             robot_publisher.publish(brickToPick)
             robot_queue += 1
+            rospy.loginfo("X: %f, Y: %f, Type: %d Robot queue: %d" % (brickToPick.x, brickToPick.y, brickToPick.type, robot_queue))
+            bricks.remove(bestBrick)
             if brickToPick.type == brickToPick.RED:
                 currentOrders[order_to_get_brick].red_bricks -= 1
             elif brickToPick.type == brickToPick.YELLOW:
                 currentOrders[order_to_get_brick].yellow_bricks -= 1
             elif brickToPick.type == brickToPick.BLUE:
                 currentOrders[order_to_get_brick].blue_bricks -= 1
-            rospy.loginfo("Pick! Type: %d, OrderTray: %d, OrderNr: %d, ID: %d, R: %d, B: %d, Y: %d" % (brickToPick.type, currentOrders[order_to_get_brick].order_tray, order_to_get_brick, currentOrders[order_to_get_brick].order_id, currentOrders[order_to_get_brick].red_bricks, currentOrders[order_to_get_brick].blue_bricks, currentOrders[order_to_get_brick].yellow_bricks))
-	    bricks.remove(bestBrick)
         # No orders need any of the bricks in the system - start new order..!
-        else:
+        elif (stopping == False):
             # Start new order
             for i in range(len(currentOrders)):
                 if currentOrders[i] == 0:
-                    currentOrders[i] = findOrder(0,0,0)
-                    currentOrders[i].order_tray = i+1
+                    blue = 0
+                    red = 0
+                    yellow = 0
+                    for j in range(len(bricks)):
+                        if bricks[j].type == bricks[j].RED:
+                            red += 1
+                        elif bricks[j].type == bricks[j].BLUE:
+                            blue += 1
+                        elif bricks[j].type == bricks[j].YELLOW:
+                            yellow += 1
+                    tmpOrder = findOrder(blue, red, yellow)
+                    if tmpOrder == 0:
+                        tmpOrder = findOrder(0,0,0)
+                    currentOrders[i] = tmpOrder
                     if currentOrders[i] != 0:
+                        currentOrders[i].order_tray = i+1
                         bricksRemaining[i] = currentOrders[i].red_bricks + currentOrders[i].yellow_bricks + currentOrders[i].blue_bricks
                         logPublisher.publish("Order #%d started in tray %d - ticket: \"%s\" at time: %s" % (currentOrders[i].order_id, currentOrders[i].order_tray, currentOrders[i].order_ticket, currentOrders[i].header.stamp))
                     break
-                else:
-                    rospy.loginfo("Error picking order")
         
             
 def robotCallback(msg):
@@ -224,9 +238,7 @@ def robotCallback(msg):
             currentOrders[msg.order-1].yellow_bricks += 1
         elif msg.type == msg.BLUE:
             currentOrders[msg.order-1].blue_bricks += 1  
-    rospy.loginfo("Brick picked, succes: %d, BrickType: %d, Remaining in order %d: %d" % (msg.succes, msg.type, msg.order-1, bricksRemaining[msg.order-1]))
-    
-            
+    rospy.loginfo("Brick picked, succes: %d, BrickType: %d, Remaining in order %d: %d" % (msg.succes, msg.type, msg.order-1, bricksRemaining[msg.order-1]))          
 
 def changeStateCallback(msg):
     global next_state 
@@ -239,6 +251,23 @@ def brickCallback(msg):
     msg.y -= offset_y
     queueBricks.append(msg)
 
+def logState(last_state, new_state):
+    if last_state.state != new_state.state:
+        logService = rospy.ServiceProxy('/Messy2Controller/order_service', command)
+        request = commandRequest()
+        request.command_number = request.LOG
+        request.log_event = new_state.state
+        response = logService(request)
+
+def emergencyStopCallback(msg):
+    global emergencyStopStatus
+    if msg.data == True:
+        global next_state
+        next_state.state = state.PML_ESTOP
+        emergencyStopStatus = True
+    elif msg.data == False:
+        emergencyStopStatus = False
+
 def orderHandler():
     rospy.init_node('OrderHandler')
     
@@ -249,7 +278,9 @@ def orderHandler():
     global state
     state.state = state.PML_IDLE
     global next_state
-    next_state.state = state.PML_EXECUTE
+    next_state.state = state.PML_IDLE
+    global last_state
+    last_state.state = state.PML_IDLE
     
     # Subscriber for external state change
     changeStateTopic = rospy.get_param("~change_state_sub_topic", "/bpOrderHandler/change_state")
@@ -284,6 +315,10 @@ def orderHandler():
     ProductionTime = 0
     idealOrderTime = 45
     
+    # Emergency stop subscriber
+    emergencyStopSubTopic = rospy.get_param("~emergency_stop_topic", "/emergency_stop")
+    rospy.Subscriber(emergencyStopSubTopic, Bool, emergencyStopCallback)
+    
     # System state publisher for the GUI
     systemStatePubTopic = rospy.get_param("~system_state_publisher_topic", "/bpOrderHandler/system_state")
     systemStatePublisher = rospy.Publisher(systemStatePubTopic, system_state)
@@ -299,7 +334,8 @@ def orderHandler():
     orderDataPublisher = rospy.Publisher(orderDataPubTopic, order)
 
     global ordersDone
-    global totalOrders    
+    global totalOrders  
+    global currentOrders  
 
     # End of Init
     
@@ -309,12 +345,15 @@ def orderHandler():
         TotalRuntime += 1.0/loop_rate
         if hasStateChanged():
             rospy.loginfo("System state changed from %d to %d" % (state.state, next_state.state))
+            last_state.state = state.state
             state.state = next_state.state       
                  
         if state.state == state.PML_IDLE:
+            logState(last_state, state)
             rospy.loginfo("PML_IDLE")
         elif state.state == state.PML_EXECUTE:
-            execute()
+            logState(last_state, state)
+            execute(False)
             ProductionTime += 1.0/loop_rate
         elif state.state == state.PML_COMPLETE:
             rospy.loginfo("PML_COMPLETE")
@@ -323,9 +362,68 @@ def orderHandler():
         elif state.state == state.PML_SUSPENDED:
             rospy.loginfo("PML_SUSPENDED")
         elif state.state == state.PML_ABORTED:
+            logState(last_state, state)
             rospy.loginfo("PML_ABORTED")
         elif state.state == state.PML_STOPPED:
+            logState(last_state, state)
             rospy.loginfo("PML_STOPPED")
+        # Transition states
+        elif state.state == state.PML_START: #Start the system from Idle state ending in execute
+            if (last_state.state != state.PML_IDLE):
+                logPublisher.publish("System can only be started from IDLE.. Try resetting system")
+                state.state = last_state.state
+                next_state.state = last_state.state
+            else:
+                next_state.state = state.PML_EXECUTE
+                plcService = rospy.ServiceProxy('/plc_controller/plc_command', plc_command)
+                request = plc_commandRequest()
+                request.command_number = request.START_BELT
+                response = plcService(request)
+            rospy.loginfo("PML_START")
+        elif state.state == state.PML_STOP: #Controlled stop - finish orders
+            rospy.loginfo("PML_STOP")
+            if (last_state.state != state.PML_EXECUTE and last_state.state != state.PML_STOP):
+                logPublisher.publish("System can only be stopped from EXECUTE..")
+                state.state = last_state.state
+                next_state.state = last_state.state
+            else:
+                if last_state != state.PML_STOP:
+                    logPublisher.publish("System is stopping - current orders are finished first..")
+                execute(True)
+                if (currentOrders[0] == 0 and currentOrders[1] == 0 and currentOrders[2] == 0):
+                    next_state.state = state.PML_STOPPED
+                    plcService = rospy.ServiceProxy('/plc_controller/plc_command', plc_command)
+                    request = plc_commandRequest()
+                    request.command_number = request.STOP_BELT
+                    response = plcService(request)
+                         
+        elif state.state == state.PML_RESET: #Reset after ESTOP and ABORTED
+            rospy.loginfo("PML_RESET")
+            if emergencyStopStatus == False:
+                if last_state.state == state.PML_STOPPED:
+                    next_state.state = state.PML_IDLE
+                elif last_state.state == state.PML_ABORTED:
+                    next_state.state = state.PML_IDLE
+                else:
+                    if last_state != state.PML_RESET:
+                        logPublisher.publish("System can only be resetted from STOPPED and ABORTED..")                       
+                    state.state = last_state.state
+                    next_state.state = last_state.state
+            elif last_state.state != state.PML_RESET:
+                logPublisher.publish("Emergency stop is engaged - release before reset!")
+
+                
+        elif state.state == state.PML_ESTOP: #STOP the system and end in aborted
+            currentOrders[0] = 0;
+            currentOrders[1] = 0;
+            currentOrders[2] = 0;            
+            rospy.loginfo("PML_ESTOP")
+            logPublisher.publish("ESTOP..! Release Emergency stop, reengage robot arm power, resume robot program, press reset and start to start system")
+            plcService = rospy.ServiceProxy('/plc_controller/plc_command', plc_command)
+            request = plc_commandRequest()
+            request.command_number = request.STOP_BELT
+            response = plcService(request)
+            next_state.state = state.PML_ABORTED
             
         # Calculate and publish data for GUI
         counter += 1
@@ -334,7 +432,7 @@ def orderHandler():
             # OEE data
             oeeData = oee_data()
             oeeData.availability = (ProductionTime / TotalRuntime)
-            oeeData.performance = ((idealOrderTime * ordersDone) / ProductionTime)
+            oeeData.performance = ((idealOrderTime * ordersDone) / (ProductionTime + 0.00001))
             oeeData.quality = ordersDone / (totalOrders + 0.00001)
             oeeData.oee = oeeData.availability*oeeData.performance*oeeData.quality
             oeeDataPublisher.publish(oeeData)       
@@ -363,6 +461,7 @@ def orderHandler():
 		    tmpOrder.time = str(0)
 		    orderDataPublisher.publish(tmpOrder)		    
         
+        last_state.state = state.state
         rospy.sleep(1.0/loop_rate)
         
     rospy.spin()

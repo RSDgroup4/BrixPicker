@@ -15,7 +15,8 @@
 
 #include "ros/ros.h"
 #include "std_msgs/ByteMultiArray.h"
-#include "bpPLCController/command.h"
+#include "bpPLCController/plc_command.h"
+#include "std_msgs/Bool.h"
 
 class PLCController
 {
@@ -27,19 +28,21 @@ private:
   bool isSafetyHigh;
   bool setBelt;
   bool setSafety;
+  std_msgs::Bool emergency_stop_msg;
   /* private methods */
 
 public:
 
   /* public variables */
   ros::Publisher plc_serial_publisher;
+  ros::Publisher emergency_stop_publisher;
   ros::ServiceServer plc_service;
 
   /* public methods */
   PLCController();
 
-  bool commandServiceHandler(bpPLCController::command::Request  &req,
-           bpPLCController::command::Response &res);
+  bool commandServiceHandler(bpPLCController::plc_command::Request  &req,
+           bpPLCController::plc_command::Response &res);
 
   void recieveSerialDataHandler(const std_msgs::ByteMultiArrayConstPtr& msg);
 

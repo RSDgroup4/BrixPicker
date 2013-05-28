@@ -15,6 +15,7 @@
   <depend package="sensor_msgs"/>
   <depend package="bpMsgs"/>
   <depend package="bpDrivers"/>
+  <depend package="bpPLCController"/>
 
 </package>
 

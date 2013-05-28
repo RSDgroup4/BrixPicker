@@ -681,100 +681,111 @@ void RX60Driver::checkBounds(double & value, const double max, const double min,
 bool RX60Driver::commandServiceHandler(	bpDrivers::command::Request  &req,
          	 	 	 	 	 	 	 	 	bpDrivers::command::Response &res)
 {
-	double joints[6];
-	double position[6];
-	switch (req.command_number) {
-			case bpDrivers::command::Request::GET_JOINT_CONFIGURATION:
-				getPosition(joints, eCT_JOINT_ANGLES);
-				res.joint1 = joints[0];
-				res.joint2 = joints[1];
-				res.joint3 = joints[2];
-				res.joint4 = joints[3];
-				res.joint5 = joints[4];
-				res.joint6 = joints[5];
-				break;
-			case bpDrivers::command::Request::SET_JOINT_CONFIGURATION:
-				joints[0] = req.joint1;
-				joints[1] = req.joint2;
-				joints[2] = req.joint3;
-				joints[3] = req.joint4;
-				joints[4] = req.joint5;
-				joints[5] = req.joint6;
-				move(joints, RX60Driver::eCT_JOINT_ANGLES, false,
-							 RX60Driver::eIT_JOINT_SPACE);
-				break;
-			case bpDrivers::command::Request::SET_TOOL_FLANGE_CARTESIAN_POSITION:
-				position[0] = req.x;
-				position[1] = req.y;
-				position[2] = req.z;
-				position[3] = req.theta_x;
-				position[4] = req.theta_y;
-				position[5] = req.theta_z;
-				move(position, RX60Driver::eCT_CARTESIAN_COORDINATES, false,
-							 RX60Driver::eIT_CARTESIAN_SPACE);
-				break;
-			case bpDrivers::command::Request::GET_PARAMETERS:
-				bool blend;
-				getMovementParameters(	res.velocity_procentage,
-										res.acceleration_procentage,
-										res.deceleration_procentage,
-										res.max_rotational_velocity,
-										res.max_cartesian_velocity,
-										blend,
-										res.reach,
-										res.leave);
-				res.blend = (uint8_t)blend;
-				break;
-			case bpDrivers::command::Request::SET_PARAMETERS:
-				setMovementParameters(	req.velocity_procentage,
-										req.acceleration_procentage,
-										req.deceleration_procentage,
-										req.max_rotational_velocity,
-										req.max_cartesian_velocity,
-										req.blend,
-										req.reach,
-										req.leave);
-				break;
-			case bpDrivers::command::Request::GET_TOOL_FLANGE_POSITION:
-				getPosition(position,eCT_CARTESIAN_COORDINATES);
-				res.x = position[0];
-				res.y = position[1];
-				res.z = position[2];
-				res.theta_x = position[3];
-				res.theta_y = position[4];
-				res.theta_z = position[5];
-				break;
-
-			case bpDrivers::command::Request::IS_SETTLED:
-				bool is_settled;
-				isSettled(is_settled);
-				res.is_settled = is_settled;
-				break;
-
-			case bpDrivers::command::Request::SET_MAX_SPEED:
-				setMaxSpeedPercentage(req.velocity_procentage);
-				break;
-
-			case bpDrivers::command::Request::SET_MAX_ACCELERATION:
-				setMaxAccelerationPercentage(req.acceleration_procentage);
-				break;
-
-			case bpDrivers::command::Request::SET_MAX_DEACCELERATION:
-				setMaxDecelerationPercentage(req.deceleration_procentage);
-				break;
-
-			case bpDrivers::command::Request::SET_VALVE1:
-				setDigitalOutput(eDO_VALVE1,req.output_state);
-				break;
-
-			case bpDrivers::command::Request::SET_VALVE2:
-				setDigitalOutput(eDO_VALVE2,req.output_state);
-				break;
-
-			default:
-				ROS_ERROR("RX60 controller service called with unknown command number");
-				break;
+	if (!isConnected())
+	{
+		connect(rx60_controller_ip, rx60_controller_port);
 	}
-	return true;
+	if (isConnected())
+	{
+		double joints[6];
+		double position[6];
+		switch (req.command_number) {
+				case bpDrivers::command::Request::GET_JOINT_CONFIGURATION:
+					getPosition(joints, eCT_JOINT_ANGLES);
+					res.joint1 = joints[0];
+					res.joint2 = joints[1];
+					res.joint3 = joints[2];
+					res.joint4 = joints[3];
+					res.joint5 = joints[4];
+					res.joint6 = joints[5];
+					break;
+				case bpDrivers::command::Request::SET_JOINT_CONFIGURATION:
+					joints[0] = req.joint1;
+					joints[1] = req.joint2;
+					joints[2] = req.joint3;
+					joints[3] = req.joint4;
+					joints[4] = req.joint5;
+					joints[5] = req.joint6;
+					move(joints, RX60Driver::eCT_JOINT_ANGLES, false,
+								 RX60Driver::eIT_JOINT_SPACE);
+					break;
+				case bpDrivers::command::Request::SET_TOOL_FLANGE_CARTESIAN_POSITION:
+					position[0] = req.x;
+					position[1] = req.y;
+					position[2] = req.z;
+					position[3] = req.theta_x;
+					position[4] = req.theta_y;
+					position[5] = req.theta_z;
+					move(position, RX60Driver::eCT_CARTESIAN_COORDINATES, false,
+								 RX60Driver::eIT_CARTESIAN_SPACE);
+					break;
+				case bpDrivers::command::Request::GET_PARAMETERS:
+					bool blend;
+					getMovementParameters(	res.velocity_procentage,
+											res.acceleration_procentage,
+											res.deceleration_procentage,
+											res.max_rotational_velocity,
+											res.max_cartesian_velocity,
+											blend,
+											res.reach,
+											res.leave);
+					res.blend = (uint8_t)blend;
+					break;
+				case bpDrivers::command::Request::SET_PARAMETERS:
+					setMovementParameters(	req.velocity_procentage,
+											req.acceleration_procentage,
+											req.deceleration_procentage,
+											req.max_rotational_velocity,
+											req.max_cartesian_velocity,
+											req.blend,
+											req.reach,
+											req.leave);
+					break;
+				case bpDrivers::command::Request::GET_TOOL_FLANGE_POSITION:
+					getPosition(position,eCT_CARTESIAN_COORDINATES);
+					res.x = position[0];
+					res.y = position[1];
+					res.z = position[2];
+					res.theta_x = position[3];
+					res.theta_y = position[4];
+					res.theta_z = position[5];
+					break;
+
+				case bpDrivers::command::Request::IS_SETTLED:
+					bool is_settled;
+					isSettled(is_settled);
+					res.is_settled = is_settled;
+					break;
+
+				case bpDrivers::command::Request::SET_MAX_SPEED:
+					setMaxSpeedPercentage(req.velocity_procentage);
+					break;
+
+				case bpDrivers::command::Request::SET_MAX_ACCELERATION:
+					setMaxAccelerationPercentage(req.acceleration_procentage);
+					break;
+
+				case bpDrivers::command::Request::SET_MAX_DEACCELERATION:
+					setMaxDecelerationPercentage(req.deceleration_procentage);
+					break;
+
+				case bpDrivers::command::Request::SET_VALVE1:
+					setDigitalOutput(eDO_VALVE1,req.output_state);
+					break;
+
+				case bpDrivers::command::Request::SET_VALVE2:
+					setDigitalOutput(eDO_VALVE2,req.output_state);
+					break;
+
+				case bpDrivers::command::Request::RESET_MOTION:
+					resetMotion();
+					break;
+
+				default:
+					ROS_ERROR("RX60 controller service called with unknown command number");
+					break;
+		}
+		return true;
+	}
 }
 

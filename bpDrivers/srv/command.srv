@@ -13,6 +13,7 @@ uint8 SET_MAX_ACCELERATION = 14
 uint8 SET_MAX_DEACCELERATION = 15
 uint8 SET_VALVE1 = 16
 uint8 SET_VALVE2 = 17
+uint8 RESET_MOTION = 18
 
 uint8 command_number
 float64 x

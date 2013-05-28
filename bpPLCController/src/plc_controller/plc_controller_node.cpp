@@ -18,6 +18,7 @@ int main(int argc, char **argv)
   std::string plc_serial_tx_publisher_topic;
   std::string plc_serial_rx_subscriber_topic;
   std::string plc_command_service_name;
+  std::string emergency_stop_publisher_topic;
   int loop_rate_param;
 
   /* initialize ros usage */
@@ -32,6 +33,7 @@ int main(int argc, char **argv)
   n.param<std::string> ("plc_serial_tx_publisher_topic", plc_serial_tx_publisher_topic, "S0_rx_msg");
   n.param<std::string> ("plc_serial_rx_subscriber_topic", plc_serial_rx_subscriber_topic, "S0_tx_msg");
   n.param<std::string> ("plc_command_service_name", plc_command_service_name, "plc_command");
+  n.param<std::string> ("emergency_stop_publisher_topic", emergency_stop_publisher_topic, "/emergency_stop");
   n.param<int> ("loop_rate", loop_rate_param, 25);
 
 
@@ -40,6 +42,8 @@ int main(int argc, char **argv)
   pc.plc_service = n.advertiseService(plc_command_service_name, &PLCController::commandServiceHandler, &pc);
 
   pc.plc_serial_publisher = nh.advertise<std_msgs::ByteMultiArray> (plc_serial_tx_publisher_topic.c_str(), 20,1);
+
+  pc.emergency_stop_publisher = nh.advertise<std_msgs::Bool> (emergency_stop_publisher_topic.c_str(), 20, 1);
 
   plc_serial_subscriber = nh.subscribe<std_msgs::ByteMultiArray> (plc_serial_rx_subscriber_topic.c_str(), 20, &PLCController::recieveSerialDataHandler, &pc);
 
