@@ -161,6 +161,19 @@ ROSBUILD_gensrv_py/fast:
 .PHONY : ROSBUILD_gensrv_py/fast
 
 #=============================================================================
+# Target rules for targets named brickShape
+
+# Build rule for target.
+brickShape: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 brickShape
+.PHONY : brickShape
+
+# fast build rule for target.
+brickShape/fast:
+	$(MAKE) -f CMakeFiles/brickShape.dir/build.make CMakeFiles/brickShape.dir/build
+.PHONY : brickShape/fast
+
+#=============================================================================
 # Target rules for targets named bricksDetector
 
 # Build rule for target.
@@ -372,6 +385,21 @@ src/main.s:
 	$(MAKE) -f CMakeFiles/bricksDetector.dir/build.make CMakeFiles/bricksDetector.dir/src/main.s
 .PHONY : src/main.s
 
+# target to build an object file
+src/shape.o:
+	$(MAKE) -f CMakeFiles/brickShape.dir/build.make CMakeFiles/brickShape.dir/src/shape.o
+.PHONY : src/shape.o
+
+# target to preprocess a source file
+src/shape.i:
+	$(MAKE) -f CMakeFiles/brickShape.dir/build.make CMakeFiles/brickShape.dir/src/shape.i
+.PHONY : src/shape.i
+
+# target to generate assembly for a file
+src/shape.s:
+	$(MAKE) -f CMakeFiles/brickShape.dir/build.make CMakeFiles/brickShape.dir/src/shape.s
+.PHONY : src/shape.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -383,6 +411,7 @@ help:
 	@echo "... ROSBUILD_gensrv_cpp"
 	@echo "... ROSBUILD_gensrv_lisp"
 	@echo "... ROSBUILD_gensrv_py"
+	@echo "... brickShape"
 	@echo "... bricksDetector"
 	@echo "... brickservice"
 	@echo "... clean-test-results"
@@ -405,6 +434,9 @@ help:
 	@echo "... src/main.o"
 	@echo "... src/main.i"
 	@echo "... src/main.s"
+	@echo "... src/shape.o"
+	@echo "... src/shape.i"
+	@echo "... src/shape.s"
 .PHONY : help
 
 

@@ -11,33 +11,37 @@
     var ros;    
     var rosLog = "";
     window.onload=function(){
-        ros = new ROS('ws://localhost:9090');
-        test = new WebSocket("ws://localhost:9090");
+		
+		
+	setTimeout(function(){	
+		
+		ros = new ROS('ws://192.168.10.164:9090');
 
-	var listenerOee = new ros.Topic({
-	name        :'/oee',
-	messageType :'bpMsgs/oee_data'
-	});
+		var listenerOee = new ros.Topic({
+		name        :'/oee',
+		messageType :'bpMsgs/oee_data'
+		});
 
-	var listenerOrderData = new ros.Topic({
-	name        :'/bpOrderHandler/order_status',
-	messageType :'bpMsgs/order'
-	});
-	var listenerSystemState = new ros.Topic({
-	    name        :'/bpOrderHandler/system_state',
-	    messageType :'bpMsgs/system_state'
-	});
+		var listenerOrderData = new ros.Topic({
+		name        :'/bpOrderHandler/order_status',
+		messageType :'bpMsgs/order'
+		});
+		var listenerSystemState = new ros.Topic({
+		    name        :'/bpOrderHandler/system_state',
+		    messageType :'bpMsgs/system_state'
+		});
 
-	var listenerLog = new ros.Topic({
-	    name        :'/log',
-	    messageType :'std_msgs/String'
-	});
+		var listenerLog = new ros.Topic({
+		    name        :'/log',
+		    messageType :'std_msgs/String'
+		});
 
-	//Subscribe block.
-	listenerOee.subscribe(OeeCallback);
-	listenerOrderData.subscribe(OrderDataCallback);
-	listenerSystemState.subscribe(SystemStateCallback);
-	listenerLog.subscribe(LogCallback);
+		//Subscribe block.
+		listenerOee.subscribe(OeeCallback);
+		listenerOrderData.subscribe(OrderDataCallback);
+		listenerSystemState.subscribe(SystemStateCallback);
+		listenerLog.subscribe(LogCallback);
+	},3000);
     }
 
     //Callback functions.

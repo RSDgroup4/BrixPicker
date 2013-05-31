@@ -209,7 +209,7 @@ bool calcPositions(bpMsgs::robot_pick& brick)
 	// Calculate Z
 	double z_pickup = (1.2963*pow(x,2.0) - 0.8685*x - 0.0738);
 	if (y > 0.1)
-		z_pickup += y * 0.015;
+		z_pickup += y * 0.008;
 	
 
 	ROS_INFO("Theta: %f, X: %f, Y: %f, Z: %f", theta_y_offset, x, y, z_pickup);

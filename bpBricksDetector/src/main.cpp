@@ -262,11 +262,13 @@ void imageCallback(const sensor_msgs::ImageConstPtr& original_image)
 
 
 				bool oldBrick = false;
+				bool brickFound = false;
 				for (int i = 0; i < bricks.size(); i++)
 				{
 					// Check if the brick is already known
-					if (abs(tmpBrick.x - bricks[i].back().x) < 0.01 && ((tmpBrick.y - bricks[i].back().y) > 0.003 && (tmpBrick.y - bricks[i].back().y) < 0.02) && tmpBrick.type == bricks[i].back().type )
+					if (!brickFound && abs(tmpBrick.x - bricks[i].back().x) < 0.01 && ((tmpBrick.y - bricks[i].back().y) > 0.003 && (tmpBrick.y - bricks[i].back().y) < 0.02) && tmpBrick.type == bricks[i].back().type )
 					{
+						brickFound = true;
 						ROS_INFO("The same brick!");
 						oldBrick = true;
 						// last time we detect it - publish it!

@@ -1,8 +1,8 @@
 <launch>
+  <include file="$(find rosbridge_launch)/launch/simple.launch" />
   <include file="$(find bpLaunch)/launch/usb_cam.launch" />
   <include file="$(find bpLaunch)/launch/plc_controller.launch" />
   <include file="$(find bpLaunch)/launch/rx60_controller.launch" />
-  <include file="$(find rosbridge_launch)/launch/simple.launch" />
   <group ns="/bpRobotMotionController">  
     <node name="robot_motion_controller" pkg="bpRobotMotionPlanner" type="robot_motion_controller" output="screen">
        <param name="brick_subscriber_topic" value="/bpRobotMotionController/brick_command_topic" />
@@ -21,6 +21,6 @@
   </group>
   <node name="Processed_image" pkg="image_view" type="image_view" >
     <remap from="image" to="/camera/image_processed"/>
-    <param name="autosize" value="true" />
+    <param name="autosize" value="false" />
   </node>
 </launch>

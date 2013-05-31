@@ -128,6 +128,7 @@ def execute(stopping):
     global totalOrders
     global ordersDone
     global currentOrders
+    global queueBricks
     
     while len(queueBricks) > 0:
 	bricks.append(queueBricks.pop())
@@ -250,6 +251,7 @@ def brickCallback(msg):
     msg.x += offset_x
     msg.y -= offset_y
     queueBricks.append(msg)
+    rospy.loginfo("BRICK recieved")
 
 def logState(last_state, new_state):
     if last_state.state != new_state.state:
@@ -335,7 +337,8 @@ def orderHandler():
 
     global ordersDone
     global totalOrders  
-    global currentOrders  
+    global currentOrders
+    global robot_queue
 
     # End of Init
     
@@ -350,7 +353,6 @@ def orderHandler():
                  
         if state.state == state.PML_IDLE:
             logState(last_state, state)
-            rospy.loginfo("PML_IDLE")
         elif state.state == state.PML_EXECUTE:
             logState(last_state, state)
             execute(False)
@@ -363,10 +365,8 @@ def orderHandler():
             rospy.loginfo("PML_SUSPENDED")
         elif state.state == state.PML_ABORTED:
             logState(last_state, state)
-            rospy.loginfo("PML_ABORTED")
         elif state.state == state.PML_STOPPED:
             logState(last_state, state)
-            rospy.loginfo("PML_STOPPED")
         # Transition states
         elif state.state == state.PML_START: #Start the system from Idle state ending in execute
             if (last_state.state != state.PML_IDLE):
@@ -387,7 +387,7 @@ def orderHandler():
                 state.state = last_state.state
                 next_state.state = last_state.state
             else:
-                if last_state != state.PML_STOP:
+                if last_state.state != state.PML_STOP:
                     logPublisher.publish("System is stopping - current orders are finished first..")
                 execute(True)
                 if (currentOrders[0] == 0 and currentOrders[1] == 0 and currentOrders[2] == 0):
@@ -414,9 +414,10 @@ def orderHandler():
 
                 
         elif state.state == state.PML_ESTOP: #STOP the system and end in aborted
-            currentOrders[0] = 0;
-            currentOrders[1] = 0;
-            currentOrders[2] = 0;            
+            currentOrders[0] = 0
+            currentOrders[1] = 0
+            currentOrders[2] = 0
+            robot_queue = 0         
             rospy.loginfo("PML_ESTOP")
             logPublisher.publish("ESTOP..! Release Emergency stop, reengage robot arm power, resume robot program, press reset and start to start system")
             plcService = rospy.ServiceProxy('/plc_controller/plc_command', plc_command)
