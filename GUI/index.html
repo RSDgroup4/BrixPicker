@@ -11,45 +11,41 @@
     var ros;    
     var rosLog = "";
     window.onload=function(){
-		
-		
-	setTimeout(function(){	
-		
-		ros = new ROS('ws://192.168.10.164:9090');
+    setTimeout(function(){
+    ros = new ROS('ws://192.168.10.164:9090');
+    var listenerOee = new ros.Topic({
+	name        :'/oee',
+	messageType :'bpMsgs/oee_data'
+	});
 
-		var listenerOee = new ros.Topic({
-		name        :'/oee',
-		messageType :'bpMsgs/oee_data'
-		});
+	var listenerOrderData = new ros.Topic({
+	name        :'/bpOrderHandler/order_status',
+	messageType :'bpMsgs/order'
+	});
+	var listenerSystemState = new ros.Topic({
+	    name        :'/bpOrderHandler/system_state',
+	    messageType :'bpMsgs/system_state'
+	});
 
-		var listenerOrderData = new ros.Topic({
-		name        :'/bpOrderHandler/order_status',
-		messageType :'bpMsgs/order'
-		});
-		var listenerSystemState = new ros.Topic({
-		    name        :'/bpOrderHandler/system_state',
-		    messageType :'bpMsgs/system_state'
-		});
+	var listenerLog = new ros.Topic({
+	    name        :'/log',
+	    messageType :'std_msgs/String'
+	});
 
-		var listenerLog = new ros.Topic({
-		    name        :'/log',
-		    messageType :'std_msgs/String'
-		});
-
-		//Subscribe block.
-		listenerOee.subscribe(OeeCallback);
-		listenerOrderData.subscribe(OrderDataCallback);
-		listenerSystemState.subscribe(SystemStateCallback);
-		listenerLog.subscribe(LogCallback);
+	//Subscribe block.
+	listenerOee.subscribe(OeeCallback);
+	listenerOrderData.subscribe(OrderDataCallback);
+	listenerSystemState.subscribe(SystemStateCallback);
+	listenerLog.subscribe(LogCallback);
 	},3000);
     }
 
     //Callback functions.
     function OeeCallback(message){
-        document.getElementById("oee").innerHTML = message.oee.toFixed(2);
-        document.getElementById("avail").innerHTML = message.availability.toFixed(2);
-        document.getElementById("perform").innerHTML = message.performance.toFixed(2);
-        document.getElementById("quality").innerHTML = message.quality.toFixed(2);
+        document.getElementById("oee").innerHTML = "OEE:"+ message.oee.toFixed(2);
+        document.getElementById("avail").innerHTML = "Availability:"+ message.availability.toFixed(2);
+        document.getElementById("perform").innerHTML = "Performance:"+ message.performance.toFixed(2);
+        document.getElementById("quality").innerHTML = "Quality:" +message.quality.toFixed(2);
     }
 
     function OrderDataCallback(message){
@@ -127,7 +123,7 @@
 
     function LogCallback(message){
         //alert(message);
-        rosLog = message.data + "<br/>"+ rosLog;
+        rosLog = "- " + message.data + "<br/>"+ rosLog;
         document.getElementById("log").innerHTML = rosLog;
         //document.getElementById("log").innerHTML =   message.data + "<br/>"
     }
@@ -201,10 +197,6 @@
             <td>Order 1</td>
             <td>Order 2</td>
             <td>Order 3</td>
-            <td style="background-color: blue;"></td>
-            <td>OEE</td>
-            <td id="oee">oee</td>
-            <td style="background-color: blue;"></td>
             <td>System state</td>
         </tr>
         <tr>
@@ -212,10 +204,6 @@
             <td id="orderT1">orderT1</td>
             <td id="orderT2">orderT2</td>
             <td id="orderT3">orderT3</td>
-            <td style="background-color: blue;"></td>
-            <td>Availability</td>
-            <td id="avail">avail</td>
-            <td style="background-color: blue;"></td>
             <td rowspan="3" id="systemState">systemState</td>
         </tr>
         <tr>
@@ -223,34 +211,33 @@
             <td id="orderB1">orderB1</td>
             <td id="orderB2">orderB2</td>
             <td id="orderB3">orderB3</td>
-            <td style="background-color: blue;"></td>
-            <td>Performance</td>
-            <td id="perform">perform</td>
-            <td style="background-color: blue;"></td>
         </tr>
         <tr>
             <td id="orderId">Order ids</td>
             <td id="orderId1">orderId1</td>
             <td id="orderId2">orderId2</td>
             <td id="orderId3">orderId3</td>
-            <td style="background-color: blue;"></td>
-            <td>Quality</td>
-            <td id="quality">quality</td>
-            <td style="background-color: blue;"></td>
         </tr>
+
         <tr>
             <td>Log Window</td>
-            <td colspan="8"><div id="log" style="height:400px; overflow:auto; text-align: left;">Sample</div></td>
+            <td colspan="3"><div id="log" style="height:350px; overflow:auto; text-align: left;font-size:16px;">Sample</div>
+</td>	    
+<td> <table style="width: 270px;margin-left:auto;margin-right:auto;padding:0px;"> <tr> <td  id="oee">oee</td> </tr> 
+       <tr> <td id="avail">avail</td> </tr> 
+        <tr>  <td id="quality">quality</td> </tr> 
+         <tr> <td id="perform">perform</td> </tr> </table></td>
+		
         </tr>
     </table>
 </div>
+<br/>
 <form>
-<div id="buttons">
-<input type="button"  id="Estop" onclick="return PublishRosMessage(20)" value="E-Stop" />
-<input type="button" id="Reset" onclick="return PublishRosMessage(21)" value="Reset"/>
-<input type="button" id="Start" onclick="return PublishRosMessage(22)" value="Start"/>
-<input type="button" id="Stop" onclick="return PublishRosMessage(23)" value="Stop"/>
-<input type="button" id="Hold" onclick="return PublishRosMessage(24)" value="Hold"/>
+<div>
+<input type="button" class="css3button" id="Start" onclick="return PublishRosMessage(22)" value="Start"/>
+<input type="button" class="css3button" id="Stop" onclick="return PublishRosMessage(23)" value="Stop"/>
+<input type="button" class="css3button" id="Reset" onclick="return PublishRosMessage(21)" value="Reset"/>
+<input type="button" class="css3button"  id="Estop" onclick="return PublishRosMessage(20)" value="E-Stop" />
 </div>
 </form>
 <!--
